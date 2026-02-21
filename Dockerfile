@@ -37,8 +37,9 @@ ENV NODE_ENV=production
 # Install only production dependencies
 RUN npm ci --only=production && npm cache clean --force
 
-# Copy source code
+# Copy source code and root-level models
 COPY src ./src
+COPY emailVerification.model.js ./
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
