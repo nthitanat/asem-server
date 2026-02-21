@@ -19,6 +19,12 @@ const createReadlineInterface = () => {
  * @returns {Promise<boolean>} User's answer
  */
 const askConfirmation = (question) => {
+  // Auto-confirm in production or non-interactive environments
+  if (process.env.NODE_ENV === 'production' || !process.stdin.isTTY) {
+    console.log(`${question} (auto-confirmed in production)`);
+    return Promise.resolve(true);
+  }
+  
   return new Promise((resolve) => {
     const rl = createReadlineInterface();
     rl.question(`${question} (y/n): `, (answer) => {
