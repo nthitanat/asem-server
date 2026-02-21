@@ -14,8 +14,13 @@ services:
       - .env.production  # Single source of truth for production
     environment:
       # Override to connect to host machine's MySQL (or use RDS/external endpoint)
-      - DB_HOST=host.docker.internal
+      - DB_HOST=localhost
       # Add production-specific overrides here if needed
+    # Map host.docker.internal to gateway IP for Linux compatibility
+    extra_hosts:
+      - "host.docker.internal:172.21.0.1"
+    # Use host network to access MySQL on localhost
+    network_mode: host
     # No source code volumes in production - code is baked into image
     logging:
       driver: "json-file"
