@@ -34,6 +34,10 @@ The `config.sh` file is already created with your server credentials. Verify the
 # Update deployment (pull latest code, rebuild, restart)
 ./deploy/deploy.sh update
 
+# Skip VPN connection (if already connected or not needed)
+./deploy/deploy.sh --skip-vpn init
+./deploy/deploy.sh --skip-vpn update
+
 # Restart containers
 ./deploy/deploy.sh restart
 
@@ -103,6 +107,33 @@ The `config.sh` file is already created with your server credentials. Verify the
 **When to use**: Verify deployment is running
 
 ## 🔌 VPN Connection
+
+### Skip VPN
+
+You can skip VPN connection in two ways:
+
+**1. Via command-line flag:**
+```bash
+./deploy/deploy.sh --skip-vpn init
+./deploy/deploy.sh --skip-vpn update
+
+# Or using npm scripts
+npm run deploy:init:no-vpn
+npm run deploy:update:no-vpn
+```
+
+**2. Via configuration file:**
+Edit `deploy/config.sh` and set:
+```bash
+VPN_SKIP=true
+```
+
+Use this option when:
+- Already connected to VPN manually
+- Testing on the same network (no VPN needed)
+- VPN is temporarily unavailable
+
+### VPN Protocols
 
 The VPN script supports two protocols:
 

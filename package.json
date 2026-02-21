@@ -22,7 +22,9 @@
     "deploy:start": "./deploy/deploy.sh start",
     "deploy:stop": "./deploy/deploy.sh stop",
     "deploy:logs": "./deploy/deploy.sh logs",
-    "deploy:status": "./deploy/deploy.sh status"
+    "deploy:status": "./deploy/deploy.sh status",
+    "deploy:init:no-vpn": "./deploy/deploy.sh --skip-vpn init",
+    "deploy:update:no-vpn": "./deploy/deploy.sh --skip-vpn update"
   },
   "keywords": ["asem", "api", "rest", "mysql", "jwt"],
   "author": "",

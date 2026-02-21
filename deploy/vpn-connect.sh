@@ -50,8 +50,10 @@ connect_openconnect() {
         exit 1
     fi
     
-    # Create password file temporarily
-    echo "$VPN_PASSWORD" | sudo openconnect \
+    # Get current user's password for sudo (using VPN_PASSWORD as sudo password)
+    # Note: This assumes VPN_PASSWORD is also your macOS user password
+    # Provide both sudo password and VPN password
+    (echo "${SUDO_PASSWORD:-$VPN_PASSWORD}"; sleep 1; echo "$VPN_PASSWORD") | sudo -S openconnect \
         --user="$VPN_USERNAME" \
         --passwd-on-stdin \
         --background \
@@ -87,8 +89,8 @@ connect_openvpn() {
         exit 1
     fi
     
-    # Connect
-    sudo openvpn \
+    # Connect (provide sudo password automatically)
+    echo "${SUDO_PASSWORD:-$VPN_PASSWORD}" | sudo -S openvpn \
         --config "$SCRIPT_DIR/vpn-config.ovpn" \
         --daemon \
         --log /tmp/vpn-connect.log
@@ -110,9 +112,9 @@ disconnect_vpn() {
     echo -e "${YELLOW}🔌 Disconnecting VPN...${NC}"
     
     if [ "$VPN_PROTOCOL" = "openconnect" ]; then
-        sudo pkill -SIGTERM openconnect || true
+        echo "${SUDO_PASSWORD:-$VPN_PASSWORD}" | sudo -S pkill -SIGTERM openconnect || true
     elif [ "$VPN_PROTOCOL" = "openvpn" ]; then
-        sudo pkill -SIGTERM openvpn || true
+        echo "${SUDO_PASSWORD:-$VPN_PASSWORD}" | sudo -S pkill -SIGTERM openvpn || true
     fi
     
     sleep 1
