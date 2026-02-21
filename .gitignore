@@ -12,6 +12,10 @@ package-lock.json
 !.env.example
 !.env.development
 
+# Deployment credentials (SECURITY: Never commit!)
+deploy/config.sh
+deploy/vpn-config.ovpn
+
 # Logs
 logs/
 *.log

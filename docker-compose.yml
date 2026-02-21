@@ -1,0 +1,23 @@
+# Base Docker Compose Configuration
+# Use with docker-compose.dev.yml or docker-compose.prod.yml
+# Note: Uses external MySQL server (not containerized)
+
+services:
+  # Node.js Application Service (base configuration)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: asem-server
+    restart: unless-stopped
+    ports:
+      - "${PORT:-5001}:5001"
+    networks:
+      - asem-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Allows container to access host machine
+
+# Networks
+networks:
+  asem-network:
+    driver: bridge

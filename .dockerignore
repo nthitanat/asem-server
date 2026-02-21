@@ -1,0 +1,59 @@
+# Node.js
+node_modules
+npm-debug.log
+yarn-error.log
+yarn.lock
+package-lock.json
+
+# Environment files (will be mounted separately)
+.env
+.env.local
+.env.*.local
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+
+# Test files
+test
+tests
+*.test.js
+*.spec.js
+coverage
+
+# Documentation
+README.md
+API_DOCUMENTATION.md
+IMPLEMENTATION_SUMMARY.md
+QUICKSTART.md
+*.md
+
+# Example files
+example
+examples
+
+# Temporary files
+tmp
+temp
+*.tmp

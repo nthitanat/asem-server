@@ -1,0 +1,32 @@
+# Production Docker Compose Configuration
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Note: Connects to your local MySQL server on host machine
+
+services:
+  app:
+    build:
+      context: .
+      target: production
+      dockerfile: Dockerfile
+      args:
+        NODE_ENV: production
+    env_file:
+      - .env.production  # Single source of truth for production
+    environment:
+      # Override to connect to host machine's MySQL (or use RDS/external endpoint)
+      - DB_HOST=host.docker.internal
+      # Add production-specific overrides here if needed
+    # No source code volumes in production - code is baked into image
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M

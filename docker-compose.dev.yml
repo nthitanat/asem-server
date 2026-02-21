@@ -1,0 +1,40 @@
+# Development Docker Compose Configuration
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+# Note: Connects to your local MySQL server on host machine
+
+services:
+  app:
+    build:
+      context: .
+      target: development
+      dockerfile: Dockerfile
+    env_file:
+      - .env.development  # Single source of truth for development
+    environment:
+      # Override to connect to host machine's MySQL
+      - DB_HOST=host.docker.internal
+      # Override to use MailDev container
+      - SMTP_HOST=maildev
+      - SMTP_PORT=1025
+    volumes:
+      # Mount source code for hot-reload with nodemon
+      - ./src:/app/src
+      - ./package.json:/app/package.json
+      - ./.env.development:/app/.env.development
+      # Prevent node_modules from being overwritten
+      - /app/node_modules
+    command: npm run dev
+
+  # MailDev - Email testing tool (development only)
+  maildev:
+    image: maildev/maildev
+    container_name: asem-maildev
+    restart: unless-stopped
+    ports:
+      - "1080:1080"  # Web UI
+      - "1025:1025"  # SMTP Server
+    networks:
+      - asem-network
+    environment:
+      - MAILDEV_INCOMING_USER=
+      - MAILDEV_INCOMING_PASS=
