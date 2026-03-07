@@ -232,11 +232,11 @@ Register a new user account. Sends a verification email after registration.
 | `firstName` | string | ❌ | Max 100 chars |
 | `lastName` | string | ❌ | Max 100 chars |
 | `bestContactEmail` | string | ❌ | Valid email format |
-| `institution` | string | ❌ | Max 255 chars |
+| `institutionId` | integer | ❌ | Must reference an existing institution ID |
 | `department` | string | ❌ | Max 255 chars |
 | `areasOfExpertise` | string | ❌ | Max 1000 chars |
-| `country` | string | ❌ | Max 100 chars |
-| `researchNetwork` | string | ❌ | Max 255 chars |
+| `countryId` | integer | ❌ | Must reference an existing country ID |
+| `researchNetworkId` | integer | ❌ | Must reference an existing research network ID |
 | `fieldOfStudy` | string | ❌ | Max 255 chars |
 
 **Example Request**
@@ -247,8 +247,8 @@ Register a new user account. Sends a verification email after registration.
   "password": "Secure@1234",
   "firstName": "Jane",
   "lastName": "Doe",
-  "institution": "Chulalongkorn University",
-  "country": "Thailand"
+  "institutionId": 1,
+  "countryId": 1
 }
 ```
 
@@ -761,11 +761,11 @@ Create a new user (admin-initiated, bypasses self-registration flow).
 | `firstName` | string | ❌ | Max 100 chars |
 | `lastName` | string | ❌ | Max 100 chars |
 | `bestContactEmail` | string | ❌ | Valid email |
-| `institution` | string | ❌ | Max 255 chars |
+| `institutionId` | integer | ❌ | Must reference an existing institution ID |
 | `department` | string | ❌ | Max 255 chars |
 | `areasOfExpertise` | string | ❌ | Max 1000 chars |
-| `country` | string | ❌ | Max 100 chars |
-| `researchNetwork` | string | ❌ | Max 255 chars |
+| `countryId` | integer | ❌ | Must reference an existing country ID |
+| `researchNetworkId` | integer | ❌ | Must reference an existing research network ID |
 | `fieldOfStudy` | string | ❌ | Max 255 chars |
 
 **Response 201**
@@ -821,8 +821,12 @@ Retrieve a single user by ID.
       "first_name": "Jane",
       "last_name": "Doe",
       "role": "user",
-      "institution": "Chulalongkorn University",
-      "country": "Thailand",
+      "institution_id": 1,
+      "institution_name": "Chulalongkorn University",
+      "country_id": 1,
+      "country_name": "Thailand",
+      "research_network_id": null,
+      "research_network_name": null,
       "is_email_verified": true,
       "is_active": true,
       "created_at": "2026-03-07T04:54:32.000Z"
@@ -864,11 +868,11 @@ Update a user's profile fields. At least one field must be provided.
 | `firstName` | string | Max 100 chars |
 | `lastName` | string | Max 100 chars |
 | `bestContactEmail` | string | Valid email |
-| `institution` | string | Max 255 chars |
+| `institutionId` | integer | Must reference an existing institution ID |
 | `department` | string | Max 255 chars |
 | `areasOfExpertise` | string | Max 1000 chars |
-| `country` | string | Max 100 chars |
-| `researchNetwork` | string | Max 255 chars |
+| `countryId` | integer | Must reference an existing country ID |
+| `researchNetworkId` | integer | Must reference an existing research network ID |
 | `fieldOfStudy` | string | Max 255 chars |
 | `role` | string | `admin`, `moderator`, or `user` |
 | `isActive` | boolean | Activate / deactivate account |
@@ -877,8 +881,8 @@ Update a user's profile fields. At least one field must be provided.
 ```json
 {
   "firstName": "Jane",
-  "institution": "Chulalongkorn University",
-  "country": "Thailand"
+  "institutionId": 1,
+  "countryId": 1
 }
 ```
 
@@ -1623,11 +1627,11 @@ Creates a new user account and sends email verification.
   "firstName": "John",
   "lastName": "Doe",
   "bestContactEmail": "john.doe@work.com",
-  "institution": "University Name",
+  "institutionId": 1,
   "department": "Computer Science",
   "areasOfExpertise": "AI, Machine Learning",
-  "country": "USA",
-  "researchNetwork": "Academic Research Network"
+  "countryId": 1,
+  "researchNetworkId": 1
 }
 ```
 

@@ -46,9 +46,14 @@ const registerSchema = Joi.object({
     .email()
     .optional(),
   
-  institution: Joi.string()
-    .max(255)
-    .optional(),
+  institutionId: Joi.number()
+    .integer()
+    .positive()
+    .optional()
+    .messages({
+      'number.base': 'Institution ID must be a number',
+      'number.positive': 'Institution ID must be a positive integer'
+    }),
   
   department: Joi.string()
     .max(255)
@@ -58,13 +63,23 @@ const registerSchema = Joi.object({
     .max(1000)
     .optional(),
   
-  country: Joi.string()
-    .max(100)
-    .optional(),
+  countryId: Joi.number()
+    .integer()
+    .positive()
+    .optional()
+    .messages({
+      'number.base': 'Country ID must be a number',
+      'number.positive': 'Country ID must be a positive integer'
+    }),
   
-  researchNetwork: Joi.string()
-    .max(255)
-    .optional(),
+  researchNetworkId: Joi.number()
+    .integer()
+    .positive()
+    .optional()
+    .messages({
+      'number.base': 'Research Network ID must be a number',
+      'number.positive': 'Research Network ID must be a positive integer'
+    }),
   
   fieldOfStudy: Joi.string()
     .max(255)

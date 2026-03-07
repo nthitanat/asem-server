@@ -398,17 +398,73 @@ const syncTable = async (tableName, schema) => {
 };
 
 /**
- * Synchronize all tables
- * @returns {Promise<Array>} Array of sync results
+ * Resolve table creation order from tableSchemas using topological sort (Kahn's algorithm).
+ * Tables with no FK dependencies come first; tables that reference others come after.
+ * @param {Object} schemas - tableSchemas object
+ * @returns {string[]} Ordered array of table names
  */
+const resolveTableOrder = (schemas) => {
+  const tableNames = Object.keys(schemas);
+
+  // Build adjacency list: dep[A] = set of tables that A depends on
+  const deps = {};
+  const reverseDeps = {}; // reverseDeps[B] = tables that depend on B
+
+  for (const name of tableNames) {
+    deps[name] = new Set();
+    reverseDeps[name] = new Set();
+  }
+
+  for (const name of tableNames) {
+    const columns = schemas[name].columns || {};
+    for (const col of Object.values(columns)) {
+      if (col.foreignKey && col.foreignKey.table) {
+        const referenced = col.foreignKey.table;
+        if (deps[name] && referenced in deps) {
+          deps[name].add(referenced);
+          reverseDeps[referenced].add(name);
+        }
+      }
+    }
+  }
+
+  // Kahn's algorithm
+  const inDegree = {};
+  for (const name of tableNames) {
+    inDegree[name] = deps[name].size;
+  }
+
+  const queue = tableNames.filter((n) => inDegree[n] === 0);
+  const ordered = [];
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    ordered.push(current);
+    for (const dependent of reverseDeps[current]) {
+      inDegree[dependent]--;
+      if (inDegree[dependent] === 0) {
+        queue.push(dependent);
+      }
+    }
+  }
+
+  if (ordered.length !== tableNames.length) {
+    const remaining = tableNames.filter((n) => !ordered.includes(n));
+    logger.warn(`Circular FK dependency detected for tables: ${remaining.join(', ')}. Appending them at the end.`);
+    ordered.push(...remaining);
+  }
+
+  return ordered;
+};
+
 const syncAllTables = async () => {
   console.log('\n🔄 Starting database table synchronization...\n');
   logger.info('Starting database table synchronization');
 
   const results = [];
 
-  // Sync tables in order (users first, then tables with foreign keys)
-  const tableOrder = ['users', 'refresh_tokens', 'email_verification_tokens', 'password_reset_tokens'];
+  // Derive sync order automatically from FK dependencies in tableSchemas
+  const tableOrder = resolveTableOrder(tableSchemas);
 
   for (const tableName of tableOrder) {
     const schema = tableSchemas[tableName];

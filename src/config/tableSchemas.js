@@ -39,9 +39,14 @@ const tableSchemas = {
         type: 'VARCHAR(255)',
         nullable: true
       },
-      institution: {
-        type: 'VARCHAR(255)',
-        nullable: true
+      institution_id: {
+        type: 'INT',
+        nullable: true,
+        foreignKey: {
+          table: 'institutions',
+          column: 'id',
+          onDelete: 'SET NULL'
+        }
       },
       department: {
         type: 'VARCHAR(255)',
@@ -52,13 +57,23 @@ const tableSchemas = {
         nullable: true,
         comment: 'JSON array or comma-separated values'
       },
-      country: {
-        type: 'VARCHAR(100)',
-        nullable: true
+      country_id: {
+        type: 'INT',
+        nullable: true,
+        foreignKey: {
+          table: 'countries',
+          column: 'id',
+          onDelete: 'SET NULL'
+        }
       },
-      research_network: {
-        type: 'VARCHAR(255)',
-        nullable: true
+      research_network_id: {
+        type: 'INT',
+        nullable: true,
+        foreignKey: {
+          table: 'research_networks',
+          column: 'id',
+          onDelete: 'SET NULL'
+        }
       },
       field_of_study: {
         type: 'VARCHAR(255)',
@@ -99,7 +114,10 @@ const tableSchemas = {
       { name: 'idx_email', columns: ['email'] },
       { name: 'idx_username', columns: ['username'] },
       { name: 'idx_role', columns: ['role'] },
-      { name: 'idx_deleted', columns: ['deleted_at'] }
+      { name: 'idx_deleted', columns: ['deleted_at'] },
+      { name: 'idx_country_id', columns: ['country_id'] },
+      { name: 'idx_institution_id', columns: ['institution_id'] },
+      { name: 'idx_research_network_id', columns: ['research_network_id'] }
     ]
   },
 

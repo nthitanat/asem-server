@@ -10,6 +10,9 @@ let testData = {
   accessToken: null,
   refreshToken: null,
   userId: null,
+  countryId: null,
+  institutionId: null,
+  researchNetworkId: null,
   testUser: {
     email: `test_${Date.now()}@example.com`,
     username: `testuser${Date.now()}`,
@@ -362,6 +365,44 @@ async function testUpdateUser() {
   return response;
 }
 
+async function testUpdateUserWithFKFields() {
+  if (!testData.accessToken || !testData.userId) {
+    console.log('⚠️  Skipping test - no access token or user ID available');
+    return;
+  }
+
+  const countryId = testData.countryId;
+  const institutionId = testData.institutionId;
+  const researchNetworkId = testData.researchNetworkId;
+
+  if (!countryId && !institutionId && !researchNetworkId) {
+    console.log('⚠️  Skipping FK fields test - no lookup IDs available');
+    return;
+  }
+
+  const options = {
+    hostname: BASE_URL,
+    port: PORT,
+    path: `/api/${API_VERSION}/users/${testData.userId}`,
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${testData.accessToken}`,
+      'Content-Type': 'application/json'
+    }
+  };
+
+  const updateData = {};
+  if (countryId) updateData.country_id = countryId;
+  if (institutionId) updateData.institution_id = institutionId;
+  if (researchNetworkId) updateData.research_network_id = researchNetworkId;
+
+  const response = await makeRequest(options, updateData);
+  logTest('Update User FK Fields (countryId / institutionId / researchNetworkId)',
+    [200, 403].includes(response.statusCode) ? '✅ PASS' : '❌ FAIL',
+    response);
+  return response;
+}
+
 async function testLogout() {
   if (!testData.accessToken || !testData.refreshToken) {
     console.log('⚠️  Skipping test - no tokens available');
@@ -438,6 +479,386 @@ async function testUnauthorizedAccess() {
   return response;
 }
 
+// ── Country Tests ──────────────────────────────────────────────────────
+
+async function testGetAllCountries() {
+  if (!testData.accessToken) {
+    console.log('⚠️  Skipping test - no access token available');
+    return;
+  }
+
+  const options = {
+    hostname: BASE_URL,
+    port: PORT,
+    path: `/api/${API_VERSION}/countries`,
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${testData.accessToken}` }
+  };
+
+  const response = await makeRequest(options);
+  logTest('Get All Countries',
+    response.statusCode === 200 ? '✅ PASS' : '❌ FAIL',
+    response);
+  return response;
+}
+
+async function testCreateCountry() {
+  if (!testData.accessToken) {
+    console.log('⚠️  Skipping test - no access token available');
+    return;
+  }
+
+  const options = {
+    hostname: BASE_URL,
+    port: PORT,
+    path: `/api/${API_VERSION}/countries`,
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${testData.accessToken}`,
+      'Content-Type': 'application/json'
+    }
+  };
+
+  const response = await makeRequest(options, { name: `TestCountry_${Date.now()}` });
+  logTest('Create Country',
+    [201, 403].includes(response.statusCode) ? '✅ PASS (Expected behavior)' : '❌ FAIL',
+    response);
+
+  if (response.statusCode === 201 && response.body?.data?.country?.id) {
+    testData.countryId = response.body.data.country.id;
+  }
+  return response;
+}
+
+async function testGetCountryById() {
+  if (!testData.accessToken || !testData.countryId) {
+    console.log('⚠️  Skipping test - no access token or country ID available');
+    return;
+  }
+
+  const options = {
+    hostname: BASE_URL,
+    port: PORT,
+    path: `/api/${API_VERSION}/countries/${testData.countryId}`,
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${testData.accessToken}` }
+  };
+
+  const response = await makeRequest(options);
+  logTest('Get Country By ID',
+    response.statusCode === 200 ? '✅ PASS' : '❌ FAIL',
+    response);
+  return response;
+}
+
+async function testUpdateCountry() {
+  if (!testData.accessToken || !testData.countryId) {
+    console.log('⚠️  Skipping test - no access token or country ID available');
+    return;
+  }
+
+  const options = {
+    hostname: BASE_URL,
+    port: PORT,
+    path: `/api/${API_VERSION}/countries/${testData.countryId}`,
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${testData.accessToken}`,
+      'Content-Type': 'application/json'
+    }
+  };
+
+  const response = await makeRequest(options, { name: `UpdatedCountry_${Date.now()}` });
+  logTest('Update Country',
+    [200, 403].includes(response.statusCode) ? '✅ PASS (Expected behavior)' : '❌ FAIL',
+    response);
+  return response;
+}
+
+async function testDeleteCountry() {
+  if (!testData.accessToken || !testData.countryId) {
+    console.log('⚠️  Skipping test - no access token or country ID available');
+    return;
+  }
+
+  const options = {
+    hostname: BASE_URL,
+    port: PORT,
+    path: `/api/${API_VERSION}/countries/${testData.countryId}`,
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${testData.accessToken}` }
+  };
+
+  const response = await makeRequest(options);
+  logTest('Delete Country',
+    [200, 403].includes(response.statusCode) ? '✅ PASS (Expected behavior)' : '❌ FAIL',
+    response);
+
+  if (response.statusCode === 200) testData.countryId = null;
+  return response;
+}
+
+// ── Institution Tests ──────────────────────────────────────────────────
+
+async function testGetAllInstitutions() {
+  if (!testData.accessToken) {
+    console.log('⚠️  Skipping test - no access token available');
+    return;
+  }
+
+  const options = {
+    hostname: BASE_URL,
+    port: PORT,
+    path: `/api/${API_VERSION}/institutions?page=1&limit=10`,
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${testData.accessToken}` }
+  };
+
+  const response = await makeRequest(options);
+  logTest('Get All Institutions',
+    response.statusCode === 200 ? '✅ PASS' : '❌ FAIL',
+    response);
+  return response;
+}
+
+async function testCreateInstitution() {
+  if (!testData.accessToken) {
+    console.log('⚠️  Skipping test - no access token available');
+    return;
+  }
+
+  // Need a countryId; fetch first available if not set
+  let countryId = testData.countryId;
+  if (!countryId) {
+    const listOpts = {
+      hostname: BASE_URL,
+      port: PORT,
+      path: `/api/${API_VERSION}/countries`,
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${testData.accessToken}` }
+    };
+    const listRes = await makeRequest(listOpts);
+    const countries = listRes.body?.data?.countries;
+    if (countries && countries.length > 0) countryId = countries[0].id;
+  }
+
+  if (!countryId) {
+    console.log('⚠️  Skipping Create Institution - no country ID available');
+    return;
+  }
+
+  const options = {
+    hostname: BASE_URL,
+    port: PORT,
+    path: `/api/${API_VERSION}/institutions`,
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${testData.accessToken}`,
+      'Content-Type': 'application/json'
+    }
+  };
+
+  const response = await makeRequest(options, {
+    name: `TestInstitution_${Date.now()}`,
+    countryId
+  });
+  logTest('Create Institution',
+    [201, 403].includes(response.statusCode) ? '✅ PASS (Expected behavior)' : '❌ FAIL',
+    response);
+
+  if (response.statusCode === 201 && response.body?.data?.institution?.id) {
+    testData.institutionId = response.body.data.institution.id;
+  }
+  return response;
+}
+
+async function testGetInstitutionById() {
+  if (!testData.accessToken || !testData.institutionId) {
+    console.log('⚠️  Skipping test - no access token or institution ID available');
+    return;
+  }
+
+  const options = {
+    hostname: BASE_URL,
+    port: PORT,
+    path: `/api/${API_VERSION}/institutions/${testData.institutionId}`,
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${testData.accessToken}` }
+  };
+
+  const response = await makeRequest(options);
+  logTest('Get Institution By ID',
+    response.statusCode === 200 ? '✅ PASS' : '❌ FAIL',
+    response);
+  return response;
+}
+
+async function testUpdateInstitution() {
+  if (!testData.accessToken || !testData.institutionId) {
+    console.log('⚠️  Skipping test - no access token or institution ID available');
+    return;
+  }
+
+  const options = {
+    hostname: BASE_URL,
+    port: PORT,
+    path: `/api/${API_VERSION}/institutions/${testData.institutionId}`,
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${testData.accessToken}`,
+      'Content-Type': 'application/json'
+    }
+  };
+
+  const response = await makeRequest(options, { name: `UpdatedInstitution_${Date.now()}` });
+  logTest('Update Institution',
+    [200, 403].includes(response.statusCode) ? '✅ PASS (Expected behavior)' : '❌ FAIL',
+    response);
+  return response;
+}
+
+async function testDeleteInstitution() {
+  if (!testData.accessToken || !testData.institutionId) {
+    console.log('⚠️  Skipping test - no access token or institution ID available');
+    return;
+  }
+
+  const options = {
+    hostname: BASE_URL,
+    port: PORT,
+    path: `/api/${API_VERSION}/institutions/${testData.institutionId}`,
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${testData.accessToken}` }
+  };
+
+  const response = await makeRequest(options);
+  logTest('Delete Institution',
+    [200, 403].includes(response.statusCode) ? '✅ PASS (Expected behavior)' : '❌ FAIL',
+    response);
+
+  if (response.statusCode === 200) testData.institutionId = null;
+  return response;
+}
+
+// ── Research Network Tests ─────────────────────────────────────────────
+
+async function testGetAllResearchNetworks() {
+  if (!testData.accessToken) {
+    console.log('⚠️  Skipping test - no access token available');
+    return;
+  }
+
+  const options = {
+    hostname: BASE_URL,
+    port: PORT,
+    path: `/api/${API_VERSION}/research-networks`,
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${testData.accessToken}` }
+  };
+
+  const response = await makeRequest(options);
+  logTest('Get All Research Networks',
+    response.statusCode === 200 ? '✅ PASS' : '❌ FAIL',
+    response);
+  return response;
+}
+
+async function testCreateResearchNetwork() {
+  if (!testData.accessToken) {
+    console.log('⚠️  Skipping test - no access token available');
+    return;
+  }
+
+  const options = {
+    hostname: BASE_URL,
+    port: PORT,
+    path: `/api/${API_VERSION}/research-networks`,
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${testData.accessToken}`,
+      'Content-Type': 'application/json'
+    }
+  };
+
+  const response = await makeRequest(options, { name: `TestNetwork_${Date.now()}` });
+  logTest('Create Research Network',
+    [201, 403].includes(response.statusCode) ? '✅ PASS (Expected behavior)' : '❌ FAIL',
+    response);
+
+  if (response.statusCode === 201 && response.body?.data?.researchNetwork?.id) {
+    testData.researchNetworkId = response.body.data.researchNetwork.id;
+  }
+  return response;
+}
+
+async function testGetResearchNetworkById() {
+  if (!testData.accessToken || !testData.researchNetworkId) {
+    console.log('⚠️  Skipping test - no access token or research network ID available');
+    return;
+  }
+
+  const options = {
+    hostname: BASE_URL,
+    port: PORT,
+    path: `/api/${API_VERSION}/research-networks/${testData.researchNetworkId}`,
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${testData.accessToken}` }
+  };
+
+  const response = await makeRequest(options);
+  logTest('Get Research Network By ID',
+    response.statusCode === 200 ? '✅ PASS' : '❌ FAIL',
+    response);
+  return response;
+}
+
+async function testUpdateResearchNetwork() {
+  if (!testData.accessToken || !testData.researchNetworkId) {
+    console.log('⚠️  Skipping test - no access token or research network ID available');
+    return;
+  }
+
+  const options = {
+    hostname: BASE_URL,
+    port: PORT,
+    path: `/api/${API_VERSION}/research-networks/${testData.researchNetworkId}`,
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${testData.accessToken}`,
+      'Content-Type': 'application/json'
+    }
+  };
+
+  const response = await makeRequest(options, { name: `UpdatedNetwork_${Date.now()}` });
+  logTest('Update Research Network',
+    [200, 403].includes(response.statusCode) ? '✅ PASS (Expected behavior)' : '❌ FAIL',
+    response);
+  return response;
+}
+
+async function testDeleteResearchNetwork() {
+  if (!testData.accessToken || !testData.researchNetworkId) {
+    console.log('⚠️  Skipping test - no access token or research network ID available');
+    return;
+  }
+
+  const options = {
+    hostname: BASE_URL,
+    port: PORT,
+    path: `/api/${API_VERSION}/research-networks/${testData.researchNetworkId}`,
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${testData.accessToken}` }
+  };
+
+  const response = await makeRequest(options);
+  logTest('Delete Research Network',
+    [200, 403].includes(response.statusCode) ? '✅ PASS (Expected behavior)' : '❌ FAIL',
+    response);
+
+  if (response.statusCode === 200) testData.researchNetworkId = null;
+  return response;
+}
+
 // Main test runner
 async function runAllTests() {
   console.log('\n');
@@ -474,15 +895,43 @@ async function runAllTests() {
     await testGetAllUsers();
     await testGetUserById();
     await testUpdateUser();
-    
-    // 5. Error Handling Tests
-    console.log('\n📋 SECTION 5: ERROR HANDLING TESTS');
+
+    // 5. Country Endpoints
+    console.log('\n📋 SECTION 5: COUNTRY ENDPOINTS');
+    await testGetAllCountries();
+    await testCreateCountry();
+    await testGetCountryById();
+    await testUpdateCountry();
+    await testDeleteCountry();
+
+    // 6. Institution Endpoints
+    console.log('\n📋 SECTION 6: INSTITUTION ENDPOINTS');
+    await testGetAllInstitutions();
+    await testCreateInstitution();
+    await testGetInstitutionById();
+    await testUpdateInstitution();
+    await testDeleteInstitution();
+
+    // 7. Research Network Endpoints
+    console.log('\n📋 SECTION 7: RESEARCH NETWORK ENDPOINTS');
+    await testGetAllResearchNetworks();
+    await testCreateResearchNetwork();
+    await testGetResearchNetworkById();
+    await testUpdateResearchNetwork();
+    await testDeleteResearchNetwork();
+
+    // 8. Update User with FK references (uses IDs from sections 5-7)
+    console.log('\n📋 SECTION 8: UPDATE USER WITH FK FIELDS');
+    await testUpdateUserWithFKFields();
+
+    // 9. Error Handling Tests
+    console.log('\n📋 SECTION 9: ERROR HANDLING TESTS');
     await testInvalidEndpoint();
     await testValidationError();
     await testUnauthorizedAccess();
     
-    // 6. Cleanup - Logout
-    console.log('\n📋 SECTION 6: CLEANUP');
+    // 10. Cleanup - Logout
+    console.log('\n📋 SECTION 10: CLEANUP');
     await testLogout();
     
     // Summary

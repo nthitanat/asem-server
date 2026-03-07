@@ -14,11 +14,11 @@ const createUser = async (userData) => {
     firstName,
     lastName,
     bestContactEmail,
-    institution,
+    institutionId,
     department,
     areasOfExpertise,
-    country,
-    researchNetwork,
+    countryId,
+    researchNetworkId,
     fieldOfStudy,
     role = 'user',
     emailVerified = false
@@ -30,8 +30,8 @@ const createUser = async (userData) => {
   const sql = `
     INSERT INTO users (
       email, username, password_hash, first_name, last_name,
-      best_contact_email, institution, department, areas_of_expertise,
-      country, research_network, field_of_study, role, email_verified
+      best_contact_email, institution_id, department, areas_of_expertise,
+      country_id, research_network_id, field_of_study, role, email_verified
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
@@ -42,11 +42,11 @@ const createUser = async (userData) => {
     firstName || null,
     lastName || null,
     bestContactEmail || null,
-    institution || null,
+    institutionId || null,
     department || null,
     areasOfExpertise || null,
-    country || null,
-    researchNetwork || null,
+    countryId || null,
+    researchNetworkId || null,
     fieldOfStudy || null,
     role,
     emailVerified ? 1 : 0
@@ -62,18 +62,28 @@ const createUser = async (userData) => {
  * @returns {Promise<Object|null>} User object or null
  */
 const findUserById = async (id, includeDeleted = false) => {
-  let sql = 'SELECT * FROM users WHERE id = ?';
-  
+  let sql = `
+    SELECT u.*,
+           c.name AS country_name,
+           i.name AS institution_name,
+           rn.name AS research_network_name
+    FROM users u
+    LEFT JOIN countries c ON u.country_id = c.id
+    LEFT JOIN institutions i ON u.institution_id = i.id
+    LEFT JOIN research_networks rn ON u.research_network_id = rn.id
+    WHERE u.id = ?
+  `;
+
   if (!includeDeleted) {
-    sql += ' AND deleted_at IS NULL';
+    sql += ' AND u.deleted_at IS NULL';
   }
 
   const user = await queryOne(sql, [id]);
-  
+
   if (user) {
     delete user.password_hash;
   }
-  
+
   return user;
 };
 
@@ -85,18 +95,28 @@ const findUserById = async (id, includeDeleted = false) => {
  * @returns {Promise<Object|null>} User object or null
  */
 const findUserByEmail = async (email, includePassword = false, includeDeleted = false) => {
-  let sql = 'SELECT * FROM users WHERE email = ?';
-  
+  let sql = `
+    SELECT u.*,
+           c.name AS country_name,
+           i.name AS institution_name,
+           rn.name AS research_network_name
+    FROM users u
+    LEFT JOIN countries c ON u.country_id = c.id
+    LEFT JOIN institutions i ON u.institution_id = i.id
+    LEFT JOIN research_networks rn ON u.research_network_id = rn.id
+    WHERE u.email = ?
+  `;
+
   if (!includeDeleted) {
-    sql += ' AND deleted_at IS NULL';
+    sql += ' AND u.deleted_at IS NULL';
   }
 
   const user = await queryOne(sql, [email]);
-  
+
   if (user && !includePassword) {
     delete user.password_hash;
   }
-  
+
   return user;
 };
 
@@ -133,17 +153,24 @@ const getAllUsers = async (page = 1, limit = 20, includeDeleted = false) => {
   const offset = (page - 1) * limit;
   
   let sql = `
-    SELECT id, email, username, first_name, last_name, best_contact_email,
-           institution, department, areas_of_expertise, country, research_network,
-           field_of_study, role, email_verified, is_active, deleted_at, created_at, updated_at
-    FROM users
+    SELECT u.id, u.email, u.username, u.first_name, u.last_name, u.best_contact_email,
+           u.institution_id, i.name AS institution_name,
+           u.department, u.areas_of_expertise,
+           u.country_id, c.name AS country_name,
+           u.research_network_id, rn.name AS research_network_name,
+           u.field_of_study, u.role, u.email_verified, u.is_active,
+           u.deleted_at, u.created_at, u.updated_at
+    FROM users u
+    LEFT JOIN countries c ON u.country_id = c.id
+    LEFT JOIN institutions i ON u.institution_id = i.id
+    LEFT JOIN research_networks rn ON u.research_network_id = rn.id
   `;
-  
+
   if (!includeDeleted) {
-    sql += ' WHERE deleted_at IS NULL';
+    sql += ' WHERE u.deleted_at IS NULL';
   }
-  
-  sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+
+  sql += ' ORDER BY u.created_at DESC LIMIT ? OFFSET ?';
 
   return await query(sql, [limit, offset]);
 };
@@ -173,8 +200,8 @@ const countUsers = async (includeDeleted = false) => {
 const updateUser = async (id, updates) => {
   const allowedFields = [
     'email', 'username', 'first_name', 'last_name', 'best_contact_email',
-    'institution', 'department', 'areas_of_expertise', 'country',
-    'research_network', 'field_of_study', 'role', 'is_active'
+    'institution_id', 'department', 'areas_of_expertise', 'country_id',
+    'research_network_id', 'field_of_study', 'role', 'is_active'
   ];
 
   const fields = [];
