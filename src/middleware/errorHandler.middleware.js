@@ -30,6 +30,27 @@ const errorHandler = (err, req, res, next) => {
     return errorResponse(res, err.message, 401, 'TOKEN_ERROR');
   }
 
+  // Handle authentication errors
+  if (err.message === 'Invalid email or password') {
+    return errorResponse(res, err.message, 401, 'AUTH_ERROR');
+  }
+
+  if (err.message === 'Email already registered') {
+    return errorResponse(res, err.message, 409, 'EMAIL_EXISTS');
+  }
+
+  if (err.message === 'Username already taken') {
+    return errorResponse(res, err.message, 409, 'USERNAME_EXISTS');
+  }
+
+  if (err.message.includes('Account is inactive')) {
+    return errorResponse(res, err.message, 403, 'ACCOUNT_INACTIVE');
+  }
+
+  if (err.message.includes('Email not verified')) {
+    return errorResponse(res, err.message, 403, 'EMAIL_NOT_VERIFIED');
+  }
+
   // Default error response
   const statusCode = err.statusCode || 500;
   const message = process.env.NODE_ENV === 'production' 

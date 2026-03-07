@@ -1,45 +1,1023 @@
-# ASEM Server API Documentation
+# ASEM API Documentation
 
-Base URL: `http://localhost:5000/api/v1`
+**Base URL:** `https://engagement.chula.ac.th/asem-api`  
+**API Version:** `v1`  
+**API Prefix:** `/api/v1`  
+**Last Tested:** 2026-03-07
+
+---
+
+## Table of Contents
+
+- [Base URL & Versioning](#base-url--versioning)
+- [Authentication](#authentication)
+- [Response Format](#response-format)
+- [Error Codes](#error-codes)
+- [Rate Limiting](#rate-limiting)
+- [Health Endpoints](#health-endpoints)
+- [Auth Endpoints](#auth-endpoints)
+  - [POST /auth/register](#post-authregister)
+  - [POST /auth/login](#post-authlogin)
+  - [POST /auth/logout](#post-authlogout)
+  - [POST /auth/refresh-token](#post-authrefresh-token)
+  - [GET /auth/me](#get-authme)
+  - [POST /auth/change-password](#post-authchange-password)
+  - [GET /auth/verify-email](#get-authverify-email)
+  - [POST /auth/resend-verification](#post-authresend-verification)
+  - [POST /auth/forgot-password](#post-authforgot-password)
+  - [GET /auth/verify-reset-token](#get-authverify-reset-token)
+  - [POST /auth/reset-password](#post-authreset-password)
+- [User Endpoints](#user-endpoints)
+  - [GET /users](#get-users)
+  - [POST /users](#post-users)
+  - [GET /users/:id](#get-usersid)
+  - [PUT /users/:id](#put-usersid)
+  - [DELETE /users/:id](#delete-usersid)
+  - [POST /users/:id/restore](#post-usersidrestore)
+- [Password Requirements](#password-requirements)
+- [Roles & Permissions](#roles--permissions)
+- [Token Lifetimes](#token-lifetimes)
+- [Known Issues](#known-issues)
+
+---
+
+## Base URL & Versioning
+
+| Environment | Base URL |
+|---|---|
+| Production | `https://engagement.chula.ac.th/asem-api` |
+| API v1 prefix | `https://engagement.chula.ac.th/asem-api/api/v1` |
+
+All API endpoints below are relative to the **API v1 prefix** unless otherwise noted.
+
+---
 
 ## Authentication
 
-All protected endpoints require a JWT access token in the Authorization header:
+Protected endpoints require a JWT access token passed in the `Authorization` header:
+
 ```
 Authorization: Bearer <access_token>
 ```
 
+Tokens are obtained via [POST /auth/login](#post-authlogin) or [POST /auth/refresh-token](#post-authrefresh-token).
+
+Access tokens are **short-lived** (15 minutes). Use the refresh token to obtain a new access token before expiry. Each refresh rotates both tokens — the old refresh token is revoked.
+
+---
+
 ## Response Format
 
-### Success Response
+All responses follow a consistent envelope format.
+
+### Success
+
 ```json
 {
   "success": true,
-  "message": "Operation successful",
-  "data": { ... }
+  "message": "Operation description",
+  "data": { }
 }
 ```
 
-### Error Response
+### Success (Paginated)
+
 ```json
 {
-  "success": false,
-  "error": {
-    "message": "Error description",
-    "code": "ERROR_CODE",
-    "details": []
+  "success": true,
+  "message": "Users retrieved successfully",
+  "data": {
+    "items": [ ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 100,
+      "pages": 5,
+      "hasNext": true,
+      "hasPrev": false
+    }
   }
 }
 ```
 
-## Endpoints
+### Error
+
+```json
+{
+  "success": false,
+  "error": {
+    "message": "Human-readable error description",
+    "code": "ERROR_CODE",
+    "details": [
+      { "field": "email", "message": "Please provide a valid email address" }
+    ]
+  }
+}
+```
+
+> `details` is only present on validation errors (HTTP 400).
 
 ---
 
-## 🔐 Authentication Endpoints
+## Error Codes
 
-### 1. Register New User
-**POST** `/auth/register`
+| HTTP | Code | Meaning |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | Request body / query failed validation |
+| 400 | `INVALID_TOKEN` | Token is malformed, expired, or not found |
+| 401 | `TOKEN_REQUIRED` | Authorization header is missing |
+| 401 | `INVALID_TOKEN` | Access token is invalid or expired |
+| 401 | `INVALID_CREDENTIALS` | Wrong email or password |
+| 403 | `FORBIDDEN` | Authenticated but lacks required role |
+| 403 | `EMAIL_NOT_VERIFIED` | Account email has not been verified |
+| 404 | `NOT_FOUND` | Resource does not exist |
+| 409 | `CONFLICT` | Duplicate email or username |
+| 429 | `RATE_LIMIT_EXCEEDED` | Too many requests |
+| 429 | `AUTH_RATE_LIMIT_EXCEEDED` | Too many auth attempts |
+| 429 | `PASSWORD_RESET_RATE_LIMIT_EXCEEDED` | Too many password reset requests |
+| 429 | `EMAIL_VERIFICATION_RATE_LIMIT_EXCEEDED` | Too many verification emails requested |
+| 500 | `INTERNAL_ERROR` | Unexpected server error |
+
+---
+
+## Rate Limiting
+
+| Applies To | Window | Max Requests | Notes |
+|---|---|---|---|
+| General API | 15 min | 100 | Per IP |
+| `POST /auth/register`, `POST /auth/login` | 15 min | 10 | Successful requests not counted |
+| `POST /auth/forgot-password` | 1 hour | 3 | Per IP |
+| `POST /auth/resend-verification` | 1 hour | 5 | Per IP |
+
+Rate limit information is returned in `RateLimit-*` response headers.
+
+---
+
+## Health Endpoints
+
+### GET /health
+
+Basic server health check. No authentication required.
+
+**URL:** `GET https://engagement.chula.ac.th/asem-api/health`
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "Server is healthy",
+  "data": {
+    "uptime": 1172293.897,
+    "timestamp": "2026-03-07T04:54:32.491Z"
+  }
+}
+```
+
+---
+
+### GET /api/v1/health
+
+API version health check. No authentication required.
+
+**URL:** `GET https://engagement.chula.ac.th/asem-api/api/v1/health`
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "API is healthy",
+  "data": {
+    "version": "v1",
+    "uptime": 1172293.909,
+    "timestamp": "2026-03-07T04:54:32.503Z"
+  }
+}
+```
+
+---
+
+## Auth Endpoints
+
+### POST /auth/register
+
+Register a new user account. Sends a verification email after registration.
+
+**Rate limit:** 10 requests / 15 min per IP (failed only)
+
+**Request Body**
+
+| Field | Type | Required | Constraints |
+|---|---|---|---|
+| `email` | string | ✅ | Valid email format |
+| `username` | string | ✅ | Alphanumeric, 3–30 characters |
+| `password` | string | ✅ | Min 8 chars, must contain uppercase, lowercase, number, and special char (`@$!%*?&`) |
+| `firstName` | string | ❌ | Max 100 chars |
+| `lastName` | string | ❌ | Max 100 chars |
+| `bestContactEmail` | string | ❌ | Valid email format |
+| `institution` | string | ❌ | Max 255 chars |
+| `department` | string | ❌ | Max 255 chars |
+| `areasOfExpertise` | string | ❌ | Max 1000 chars |
+| `country` | string | ❌ | Max 100 chars |
+| `researchNetwork` | string | ❌ | Max 255 chars |
+| `fieldOfStudy` | string | ❌ | Max 255 chars |
+
+**Example Request**
+```json
+{
+  "email": "jane.doe@example.com",
+  "username": "janedoe",
+  "password": "Secure@1234",
+  "firstName": "Jane",
+  "lastName": "Doe",
+  "institution": "Chulalongkorn University",
+  "country": "Thailand"
+}
+```
+
+**Response 201**
+```json
+{
+  "success": true,
+  "message": "Registration successful. You can now log in.",
+  "data": {
+    "user": {
+      "id": 4,
+      "email": "jane.doe@example.com",
+      "username": "janedoe",
+      "first_name": "Jane",
+      "last_name": "Doe"
+    }
+  }
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | Missing required fields or invalid format |
+| 409 | `CONFLICT` | Email or username already in use |
+| 429 | `AUTH_RATE_LIMIT_EXCEEDED` | Rate limit hit |
+
+> ⚠️ **Known Issue:** Duplicate email/username currently returns **500** instead of **409**. Fix pending.
+
+---
+
+### POST /auth/login
+
+Authenticate and obtain access + refresh tokens.
+
+**Rate limit:** 10 requests / 15 min per IP (failed only)
+
+**Request Body**
+
+| Field | Type | Required |
+|---|---|---|
+| `email` | string | ✅ |
+| `password` | string | ✅ |
+
+**Example Request**
+```json
+{
+  "email": "jane.doe@example.com",
+  "password": "Secure@1234"
+}
+```
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "user": {
+      "id": 4,
+      "email": "jane.doe@example.com",
+      "username": "janedoe",
+      "first_name": "Jane",
+      "last_name": "Doe",
+      "role": "user",
+      "is_email_verified": false
+    },
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | Missing fields |
+| 401 | `INVALID_CREDENTIALS` | Wrong email or password |
+| 429 | `AUTH_RATE_LIMIT_EXCEEDED` | Rate limit hit |
+
+> ⚠️ **Known Issue:** Wrong password currently returns **500** instead of **401**. Fix pending.
+
+---
+
+### POST /auth/logout
+
+Invalidate the current refresh token. Requires authentication.
+
+**Auth:** Bearer token required
+
+**Request Body**
+
+| Field | Type | Required |
+|---|---|---|
+| `refreshToken` | string | ✅ |
+
+**Example Request**
+```json
+{
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "Logged out successfully",
+  "data": null
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | Missing `refreshToken` |
+| 401 | `TOKEN_REQUIRED` | No Authorization header |
+
+---
+
+### POST /auth/refresh-token
+
+Exchange a valid refresh token for a new access token. Old refresh token is revoked (rotation).
+
+**Request Body**
+
+| Field | Type | Required |
+|---|---|---|
+| `refreshToken` | string | ✅ |
+
+**Example Request**
+```json
+{
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "Token refreshed successfully",
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | Missing `refreshToken` |
+| 400 | `INVALID_TOKEN` | Refresh token expired or not found |
+
+---
+
+### GET /auth/me
+
+Returns the currently authenticated user's profile.
+
+**Auth:** Bearer token required
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "User data retrieved",
+  "data": {
+    "user": {
+      "id": 4,
+      "email": "jane.doe@example.com",
+      "username": "janedoe",
+      "first_name": "Jane",
+      "last_name": "Doe",
+      "role": "user",
+      "is_email_verified": false
+    }
+  }
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 401 | `TOKEN_REQUIRED` | No Authorization header |
+| 401 | `INVALID_TOKEN` | Token expired or invalid |
+
+---
+
+### POST /auth/change-password
+
+Change password for the currently authenticated user. Invalidates all existing refresh tokens.
+
+**Auth:** Bearer token required
+
+**Request Body**
+
+| Field | Type | Required | Constraints |
+|---|---|---|---|
+| `currentPassword` | string | ✅ | Must match current password |
+| `newPassword` | string | ✅ | Min 8 chars, complexity required |
+| `refreshToken` | string | ❌ | Optionally revoke the current session token |
+
+**Example Request**
+```json
+{
+  "currentPassword": "OldPass@123",
+  "newPassword": "NewSecure@456"
+}
+```
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "Password changed successfully",
+  "data": null
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | Missing or invalid fields |
+| 401 | `TOKEN_REQUIRED` | No Authorization header |
+| 401 | `INVALID_CREDENTIALS` | Wrong current password |
+
+---
+
+### GET /auth/verify-email
+
+Verify a user's email address using a one-time token sent by email.
+
+**Query Parameters**
+
+| Parameter | Type | Required |
+|---|---|---|
+| `token` | string | ✅ |
+
+**Example**
+```
+GET /api/v1/auth/verify-email?token=<verification_token>
+```
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "Email verified successfully",
+  "data": null
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | Missing `token` query param |
+| 400 | `INVALID_TOKEN` | Token expired or invalid |
+
+> ⚠️ **Known Issue:** Invalid token format currently returns **500**. Fix pending.
+
+---
+
+### POST /auth/resend-verification
+
+Resend the email verification link to a registered email address.
+
+**Rate limit:** 5 requests / hour per IP
+
+**Request Body**
+
+| Field | Type | Required |
+|---|---|---|
+| `email` | string | ✅ |
+
+**Example Request**
+```json
+{
+  "email": "jane.doe@example.com"
+}
+```
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "Verification email sent successfully",
+  "data": null
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | Invalid email format |
+| 429 | `EMAIL_VERIFICATION_RATE_LIMIT_EXCEEDED` | Rate limit hit |
+
+> ⚠️ **Known Issue:** Currently returns **500** — SMTP service not configured on production server.
+
+---
+
+### POST /auth/forgot-password
+
+Request a password reset email. Always returns success to prevent email enumeration.
+
+**Rate limit:** 3 requests / hour per IP
+
+**Request Body**
+
+| Field | Type | Required |
+|---|---|---|
+| `email` | string | ✅ |
+
+**Example Request**
+```json
+{
+  "email": "jane.doe@example.com"
+}
+```
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "If an account with that email exists, a password reset link has been sent.",
+  "data": null
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | Invalid email format |
+| 429 | `PASSWORD_RESET_RATE_LIMIT_EXCEEDED` | Rate limit hit |
+
+> ⚠️ **Known Issue:** Currently returns **500** — SMTP service not configured on production server.
+
+---
+
+### GET /auth/verify-reset-token
+
+Check whether a password reset token is still valid before showing the reset form.
+
+**Query Parameters**
+
+| Parameter | Type | Required |
+|---|---|---|
+| `token` | string | ✅ |
+
+**Example**
+```
+GET /api/v1/auth/verify-reset-token?token=<reset_token>
+```
+
+**Response 200** (valid token)
+```json
+{
+  "success": true,
+  "message": "Token is valid",
+  "data": {
+    "valid": true
+  }
+}
+```
+
+**Response 400** (invalid / expired token)
+```json
+{
+  "success": false,
+  "error": {
+    "message": "Invalid reset token",
+    "code": "INVALID_TOKEN"
+  }
+}
+```
+
+---
+
+### POST /auth/reset-password
+
+Reset a user's password using the token received by email. All sessions are terminated after reset.
+
+**Request Body**
+
+| Field | Type | Required | Constraints |
+|---|---|---|---|
+| `token` | string | ✅ | Valid reset token from email |
+| `newPassword` | string | ✅ | Min 8 chars, complexity required |
+
+**Example Request**
+```json
+{
+  "token": "<reset_token>",
+  "newPassword": "NewSecure@456"
+}
+```
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "Password reset successfully",
+  "data": null
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | Missing or invalid fields |
+| 400 | `INVALID_TOKEN` | Token expired, used, or not found |
+
+---
+
+## User Endpoints
+
+All user endpoints require:
+- **Authentication:** `Authorization: Bearer <access_token>`
+- **Email verified:** The account's email must be verified
+
+---
+
+### GET /users
+
+Retrieve a paginated list of all users.
+
+**Auth:** Bearer token required  
+**Role:** `admin` or `moderator`
+
+**Query Parameters**
+
+| Parameter | Type | Default | Constraints |
+|---|---|---|---|
+| `page` | integer | `1` | Min 1 |
+| `limit` | integer | `20` | Min 1, Max 100 |
+| `includeDeleted` | boolean | `false` | Include soft-deleted users |
+
+**Example**
+```
+GET /api/v1/users?page=1&limit=20&includeDeleted=false
+```
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "Users retrieved successfully",
+  "data": {
+    "items": [
+      {
+        "id": 1,
+        "email": "admin@example.com",
+        "username": "admin",
+        "first_name": "Admin",
+        "last_name": "User",
+        "role": "admin",
+        "is_email_verified": true,
+        "is_active": true,
+        "created_at": "2026-01-01T00:00:00.000Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 1,
+      "pages": 1,
+      "hasNext": false,
+      "hasPrev": false
+    }
+  }
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 401 | `TOKEN_REQUIRED` | No Authorization header |
+| 403 | `FORBIDDEN` | User is not admin or moderator |
+| 403 | `EMAIL_NOT_VERIFIED` | Email not verified |
+
+---
+
+### POST /users
+
+Create a new user (admin-initiated, bypasses self-registration flow).
+
+**Auth:** Bearer token required  
+**Role:** `admin`
+
+**Request Body**
+
+| Field | Type | Required | Constraints |
+|---|---|---|---|
+| `email` | string | ✅ | Valid email |
+| `username` | string | ✅ | Alphanumeric, 3–30 chars |
+| `password` | string | ✅ | Min 8 chars, complexity required |
+| `role` | string | ❌ | `admin`, `moderator`, or `user` (default: `user`) |
+| `firstName` | string | ❌ | Max 100 chars |
+| `lastName` | string | ❌ | Max 100 chars |
+| `bestContactEmail` | string | ❌ | Valid email |
+| `institution` | string | ❌ | Max 255 chars |
+| `department` | string | ❌ | Max 255 chars |
+| `areasOfExpertise` | string | ❌ | Max 1000 chars |
+| `country` | string | ❌ | Max 100 chars |
+| `researchNetwork` | string | ❌ | Max 255 chars |
+| `fieldOfStudy` | string | ❌ | Max 255 chars |
+
+**Response 201**
+```json
+{
+  "success": true,
+  "message": "User created successfully",
+  "data": {
+    "user": {
+      "id": 5,
+      "email": "newuser@example.com",
+      "username": "newuser",
+      "role": "user"
+    }
+  }
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | Missing or invalid fields |
+| 401 | `TOKEN_REQUIRED` | No Authorization header |
+| 403 | `FORBIDDEN` | User is not admin |
+| 409 | `CONFLICT` | Email or username already exists |
+
+---
+
+### GET /users/:id
+
+Retrieve a single user by ID.
+
+**Auth:** Bearer token required  
+**Access:** Admin, moderator, or the user themselves (`id` matches token's user ID)
+
+**Path Parameter**
+
+| Parameter | Type | Required |
+|---|---|---|
+| `id` | positive integer | ✅ |
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "User retrieved successfully",
+  "data": {
+    "user": {
+      "id": 4,
+      "email": "jane.doe@example.com",
+      "username": "janedoe",
+      "first_name": "Jane",
+      "last_name": "Doe",
+      "role": "user",
+      "institution": "Chulalongkorn University",
+      "country": "Thailand",
+      "is_email_verified": true,
+      "is_active": true,
+      "created_at": "2026-03-07T04:54:32.000Z"
+    }
+  }
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | `id` is not a positive integer |
+| 401 | `TOKEN_REQUIRED` | No Authorization header |
+| 403 | `FORBIDDEN` | Accessing another user's data without permission |
+| 404 | `NOT_FOUND` | User does not exist |
+
+---
+
+### PUT /users/:id
+
+Update a user's profile fields. At least one field must be provided.
+
+**Auth:** Bearer token required  
+**Access:** Admin, moderator, or the user themselves
+
+**Path Parameter**
+
+| Parameter | Type | Required |
+|---|---|---|
+| `id` | positive integer | ✅ |
+
+**Request Body** *(at least one field required)*
+
+| Field | Type | Constraints |
+|---|---|---|
+| `email` | string | Valid email |
+| `username` | string | Alphanumeric, 3–30 chars |
+| `firstName` | string | Max 100 chars |
+| `lastName` | string | Max 100 chars |
+| `bestContactEmail` | string | Valid email |
+| `institution` | string | Max 255 chars |
+| `department` | string | Max 255 chars |
+| `areasOfExpertise` | string | Max 1000 chars |
+| `country` | string | Max 100 chars |
+| `researchNetwork` | string | Max 255 chars |
+| `fieldOfStudy` | string | Max 255 chars |
+| `role` | string | `admin`, `moderator`, or `user` |
+| `isActive` | boolean | Activate / deactivate account |
+
+**Example Request**
+```json
+{
+  "firstName": "Jane",
+  "institution": "Chulalongkorn University",
+  "country": "Thailand"
+}
+```
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "User updated successfully",
+  "data": {
+    "user": { }
+  }
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | No fields provided or invalid values |
+| 401 | `TOKEN_REQUIRED` | No Authorization header |
+| 403 | `FORBIDDEN` | Not owner, admin, or moderator |
+| 404 | `NOT_FOUND` | User does not exist |
+
+---
+
+### DELETE /users/:id
+
+Delete a user. Supports soft delete (default, restorable) or hard (permanent) delete.
+
+**Auth:** Bearer token required  
+**Role:** `admin`
+
+**Path Parameter**
+
+| Parameter | Type | Required |
+|---|---|---|
+| `id` | positive integer | ✅ |
+
+**Query Parameters**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `hard` | boolean | `false` | `true` = permanent delete; `false` = soft delete |
+
+**Examples**
+```
+DELETE /api/v1/users/5           (soft delete)
+DELETE /api/v1/users/5?hard=true (permanent delete)
+```
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "User deleted successfully",
+  "data": null
+}
+```
+
+> ⚠️ Hard delete is permanent and cannot be undone.
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 401 | `TOKEN_REQUIRED` | No Authorization header |
+| 403 | `FORBIDDEN` | User is not admin |
+| 404 | `NOT_FOUND` | User does not exist |
+
+---
+
+### POST /users/:id/restore
+
+Restore a soft-deleted user.
+
+**Auth:** Bearer token required  
+**Role:** `admin`
+
+**Path Parameter**
+
+| Parameter | Type | Required |
+|---|---|---|
+| `id` | positive integer | ✅ |
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "User restored successfully",
+  "data": {
+    "user": { }
+  }
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 401 | `TOKEN_REQUIRED` | No Authorization header |
+| 403 | `FORBIDDEN` | User is not admin |
+| 404 | `NOT_FOUND` | User not found or not soft-deleted |
+
+---
+
+## Password Requirements
+
+All password fields must satisfy:
+
+- Minimum **8 characters**
+- At least one **uppercase** letter (A–Z)
+- At least one **lowercase** letter (a–z)
+- At least one **digit** (0–9)
+- At least one **special character** from: `@ $ ! % * ? &`
+
+**Valid example:** `Secure@1234`
+
+---
+
+## Roles & Permissions
+
+| Action | `user` | `moderator` | `admin` |
+|---|---|---|---|
+| Login / Register | ✅ | ✅ | ✅ |
+| View own profile | ✅ | ✅ | ✅ |
+| Update own profile | ✅ | ✅ | ✅ |
+| View all users (`GET /users`) | ❌ | ✅ | ✅ |
+| View any user (`GET /users/:id`) | ❌ | ✅ | ✅ |
+| Update any user | ❌ | ✅ | ✅ |
+| Create user (`POST /users`) | ❌ | ❌ | ✅ |
+| Delete user | ❌ | ❌ | ✅ |
+| Restore user | ❌ | ❌ | ✅ |
+
+---
+
+## Token Lifetimes
+
+| Token | Lifetime |
+|---|---|
+| Access Token | 15 minutes |
+| Refresh Token | 7 days |
+| Email Verification Token | 24 hours |
+| Password Reset Token | 1 hour |
+
+---
+
+## Known Issues
+
+The following endpoints currently return **500 Internal Server Error** and are tracked for fixes:
+
+| Endpoint | Expected Behaviour | Root Cause |
+|---|---|---|
+| `POST /auth/register` with duplicate email/username | 409 Conflict | Unhandled DB duplicate key error |
+| `POST /auth/login` with wrong password | 401 Unauthorized | bcrypt compare error not caught in service |
+| `GET /auth/verify-email?token=<invalid>` | 400 Bad Request | Token lookup exception not caught |
+| `POST /auth/resend-verification` | 200 OK | SMTP/email service not configured on server |
+| `POST /auth/forgot-password` | 200 OK | SMTP/email service not configured on server |
 
 Creates a new user account and sends email verification.
 

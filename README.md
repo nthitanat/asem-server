@@ -111,6 +111,72 @@ The server automatically creates and synchronizes the following tables:
 - `email_verification_tokens` - Email verification tokens
 - `password_reset_tokens` - Password reset tokens
 
+## Table Synchronization Workflow
+
+The table sync utility ([src/utils/tableSync.util.js](src/utils/tableSync.util.js)) runs automatically at server startup and ensures database tables match the schema definitions in [src/config/tableSchemas.js](src/config/tableSchemas.js).
+
+### Workflow Process
+
+#### 1. Server Startup Sequence
+```
+Server starts → Database connection → Table synchronization → Server ready
+```
+
+#### 2. Initialization Phase
+- Loads table schemas from [tableSchemas.js](src/config/tableSchemas.js)
+- Processes tables in dependency order (respects foreign key relationships):
+  - `users` → `refresh_tokens` → `email_verification_tokens` → `password_reset_tokens`
+
+#### 3. Table Synchronization (for each table)
+
+**If table does NOT exist:**
+1. Queries `information_schema.tables` to check existence
+2. Builds `CREATE TABLE` statement with columns, constraints, and indexes
+3. Requests confirmation (development) or auto-confirms (production)
+4. Executes CREATE TABLE statement
+5. Result: `CREATED` ✅
+
+**If table EXISTS:**
+1. Queries `information_schema.columns` for current structure
+2. Compares schema definition vs database structure
+3. Detects three types of differences:
+
+   **a) Missing Columns** (in schema, not in DB):
+   - Generates `ALTER TABLE ADD COLUMN` statement
+   - Requests confirmation for each column
+   - Executes if confirmed
+   
+   **b) Extra Columns** (in DB, not in schema):
+   - Displays warning message
+   - Does NOT delete (safety feature)
+   - Requires manual review
+   
+   **c) Type Mismatches** (column exists but different type):
+   - Displays warning with schema vs DB types
+   - Does NOT modify (safety feature)
+   - Requires manual ALTER TABLE
+
+4. Result: `UP_TO_DATE` ✅ | `UPDATED` ✅ | `WARNINGS` ⚠️ | `ERROR` ❌
+
+#### 4. Summary Report
+Displays final status for all tables with changes and warnings:
+```
+═══════════════════════════════════════════════════════
+📊 Database Synchronization Summary:
+═══════════════════════════════════════════════════════
+
+users: UP_TO_DATE
+refresh_tokens: CREATED
+  ✅ Table 'refresh_tokens' created successfully
+
+email_verification_tokens: WARNINGS
+  ⚠️  Extra columns: old_column - manual review required
+  
+password_reset_tokens: UPDATED
+  ✅ Added column 'expires_at'
+═══════════════════════════════════════════════════════
+```
+
 ## Security Features
 
 - Password hashing with bcrypt

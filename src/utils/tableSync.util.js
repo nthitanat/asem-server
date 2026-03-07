@@ -69,6 +69,26 @@ const getTableColumns = async (tableName) => {
 };
 
 /**
+ * Get existing foreign key constraints for a table
+ * @param {string} tableName - Table name
+ * @returns {Promise<Array>} Array of FK constraint information
+ */
+const getTableForeignKeys = async (tableName) => {
+  return await query(
+    `SELECT
+      CONSTRAINT_NAME as constraint_name,
+      COLUMN_NAME as column_name,
+      REFERENCED_TABLE_NAME as referenced_table,
+      REFERENCED_COLUMN_NAME as referenced_column
+    FROM information_schema.KEY_COLUMN_USAGE
+    WHERE table_schema = DATABASE()
+      AND table_name = ?
+      AND REFERENCED_TABLE_NAME IS NOT NULL`,
+    [tableName]
+  );
+};
+
+/**
  * Build CREATE TABLE SQL statement
  * @param {Object} schema - Table schema
  * @returns {string} CREATE TABLE SQL
@@ -158,6 +178,18 @@ const buildAddColumnSQL = (tableName, columnName, columnDef) => {
 };
 
 /**
+ * Build ALTER TABLE ADD FOREIGN KEY SQL
+ * @param {string} tableName - Table name
+ * @param {string} columnName - Column name
+ * @param {Object} fkDef - Foreign key definition
+ * @returns {string} ALTER TABLE SQL
+ */
+const buildAddForeignKeySQL = (tableName, columnName, fkDef) => {
+  const constraintName = `fk_${tableName}_${columnName}`;
+  return `ALTER TABLE \`${tableName}\` ADD CONSTRAINT \`${constraintName}\` FOREIGN KEY (\`${columnName}\`) REFERENCES \`${fkDef.table}\`(\`${fkDef.column}\`) ON DELETE ${fkDef.onDelete || 'CASCADE'}`;
+};
+
+/**
  * Compare column types
  * @param {string} schemaType - Type from schema
  * @param {string} dbType - Type from database
@@ -244,8 +276,22 @@ const syncTable = async (tableName, schema) => {
         }
       }
 
+      // Check for missing FK constraints on existing columns
+      const existingFKs = await getTableForeignKeys(tableName);
+      const existingFKColumns = existingFKs.map(fk => fk.column_name);
+      const missingFKs = [];
+      for (const [colName, colDef] of Object.entries(schema.columns)) {
+        if (
+          colDef.foreignKey &&
+          existingColumnNames.includes(colName) &&
+          !existingFKColumns.includes(colName)
+        ) {
+          missingFKs.push({ columnName: colName, fkDef: colDef.foreignKey });
+        }
+      }
+
       // Report findings
-      if (missingColumns.length === 0 && extraColumns.length === 0 && typeMismatches.length === 0) {
+      if (missingColumns.length === 0 && extraColumns.length === 0 && typeMismatches.length === 0 && missingFKs.length === 0) {
         result.action = 'UP_TO_DATE';
         logger.info(`Table '${tableName}' is up to date`);
         console.log(`✅ Table '${tableName}' is up to date\n`);
@@ -271,6 +317,22 @@ const syncTable = async (tableName, schema) => {
             result.changes.push(`Added column '${columnName}'`);
             logger.info(`Added column '${columnName}' to '${tableName}'`);
             console.log(`  ✅ Column '${columnName}' added\n`);
+
+            // Also add FK constraint if this column has a foreign key definition
+            if (columnDef.foreignKey) {
+              const addFKSQL = buildAddForeignKeySQL(tableName, columnName, columnDef.foreignKey);
+              console.log(`  ${addFKSQL}`);
+              const fkConfirmed = await askConfirmation(`Add foreign key constraint on '${columnName}'?`);
+              if (fkConfirmed) {
+                await query(addFKSQL);
+                result.changes.push(`Added FK constraint on '${columnName}' -> ${columnDef.foreignKey.table}.${columnDef.foreignKey.column}`);
+                logger.info(`Added FK constraint on '${columnName}' in '${tableName}'`);
+                console.log(`  ✅ FK constraint on '${columnName}' added\n`);
+              } else {
+                result.warnings.push(`User skipped FK constraint on '${columnName}'`);
+                console.log(`  ⏭️  Skipped FK constraint on '${columnName}'\n`);
+              }
+            }
           } else {
             result.warnings.push(`User skipped adding column '${columnName}'`);
             console.log(`  ⏭️  Skipped column '${columnName}'\n`);
@@ -297,6 +359,29 @@ const syncTable = async (tableName, schema) => {
         }
         console.log(`  These require manual ALTER TABLE commands - please review carefully.`);
         logger.warn(`Type mismatches in '${tableName}' require manual review`);
+      }
+
+      // Handle missing FK constraints on existing columns
+      if (missingFKs.length > 0) {
+        console.log(`\n  Missing foreign key constraints on: ${missingFKs.map(f => f.columnName).join(', ')}`);
+        result.warnings.push(`Missing FK constraints: ${missingFKs.map(f => f.columnName).join(', ')}`);
+
+        for (const { columnName, fkDef } of missingFKs) {
+          const addFKSQL = buildAddForeignKeySQL(tableName, columnName, fkDef);
+          console.log(`\n  ${addFKSQL}`);
+
+          const confirmed = await askConfirmation(`Add foreign key constraint on '${columnName}' in '${tableName}'?`);
+
+          if (confirmed) {
+            await query(addFKSQL);
+            result.changes.push(`Added FK constraint on '${columnName}' -> ${fkDef.table}.${fkDef.column}`);
+            logger.info(`Added FK constraint on '${columnName}' in '${tableName}'`);
+            console.log(`  ✅ FK constraint on '${columnName}' added\n`);
+          } else {
+            result.warnings.push(`User skipped FK constraint on '${columnName}'`);
+            console.log(`  ⏭️  Skipped FK constraint on '${columnName}'\n`);
+          }
+        }
       }
 
       result.action = result.changes.length > 0 ? 'UPDATED' : 'WARNINGS';
