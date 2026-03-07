@@ -10,10 +10,7 @@ const {
   updateResearchNetworkSchema
 } = require('../validators/researchNetwork.validator');
 
-// All research network routes require authentication
-router.use(authenticateToken);
-
-// Get all research networks (any authenticated user)
+// Get all research networks (public)
 router.get(
   '/',
   researchNetworkController.getAllResearchNetworks
@@ -22,6 +19,7 @@ router.get(
 // Get research network by ID (any authenticated user)
 router.get(
   '/:id',
+  authenticateToken,
   validate(idParamSchema, 'params'),
   researchNetworkController.getResearchNetworkById
 );
@@ -29,6 +27,7 @@ router.get(
 // Create research network (admin only)
 router.post(
   '/',
+  authenticateToken,
   requireAdmin,
   validate(createResearchNetworkSchema, 'body'),
   researchNetworkController.createResearchNetwork
@@ -37,6 +36,7 @@ router.post(
 // Update research network (admin only)
 router.put(
   '/:id',
+  authenticateToken,
   requireAdmin,
   validate(idParamSchema, 'params'),
   validate(updateResearchNetworkSchema, 'body'),
@@ -46,6 +46,7 @@ router.put(
 // Delete research network (admin only)
 router.delete(
   '/:id',
+  authenticateToken,
   requireAdmin,
   validate(idParamSchema, 'params'),
   researchNetworkController.deleteResearchNetwork

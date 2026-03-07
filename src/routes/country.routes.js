@@ -10,10 +10,7 @@ const {
   updateCountrySchema
 } = require('../validators/country.validator');
 
-// All country routes require authentication
-router.use(authenticateToken);
-
-// Get all countries (any authenticated user)
+// Get all countries (public)
 router.get(
   '/',
   countryController.getAllCountries
@@ -22,6 +19,7 @@ router.get(
 // Get country by ID (any authenticated user)
 router.get(
   '/:id',
+  authenticateToken,
   validate(idParamSchema, 'params'),
   countryController.getCountryById
 );
@@ -29,6 +27,7 @@ router.get(
 // Create country (admin only)
 router.post(
   '/',
+  authenticateToken,
   requireAdmin,
   validate(createCountrySchema, 'body'),
   countryController.createCountry
@@ -37,6 +36,7 @@ router.post(
 // Update country (admin only)
 router.put(
   '/:id',
+  authenticateToken,
   requireAdmin,
   validate(idParamSchema, 'params'),
   validate(updateCountrySchema, 'body'),
@@ -46,6 +46,7 @@ router.put(
 // Delete country (admin only)
 router.delete(
   '/:id',
+  authenticateToken,
   requireAdmin,
   validate(idParamSchema, 'params'),
   countryController.deleteCountry

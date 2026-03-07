@@ -11,10 +11,7 @@ const {
   paginationQuerySchema
 } = require('../validators/institution.validator');
 
-// All institution routes require authentication
-router.use(authenticateToken);
-
-// Get all institutions with pagination (any authenticated user)
+// Get all institutions with pagination (public)
 router.get(
   '/',
   validate(paginationQuerySchema, 'query'),
@@ -24,6 +21,7 @@ router.get(
 // Get institution by ID (any authenticated user)
 router.get(
   '/:id',
+  authenticateToken,
   validate(idParamSchema, 'params'),
   institutionController.getInstitutionById
 );
@@ -31,6 +29,7 @@ router.get(
 // Create institution (admin only)
 router.post(
   '/',
+  authenticateToken,
   requireAdmin,
   validate(createInstitutionSchema, 'body'),
   institutionController.createInstitution
@@ -39,6 +38,7 @@ router.post(
 // Update institution (admin only)
 router.put(
   '/:id',
+  authenticateToken,
   requireAdmin,
   validate(idParamSchema, 'params'),
   validate(updateInstitutionSchema, 'body'),
@@ -48,6 +48,7 @@ router.put(
 // Delete institution (admin only)
 router.delete(
   '/:id',
+  authenticateToken,
   requireAdmin,
   validate(idParamSchema, 'params'),
   institutionController.deleteInstitution
