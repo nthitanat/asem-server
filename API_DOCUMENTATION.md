@@ -34,6 +34,24 @@
   - [PUT /users/:id](#put-usersid)
   - [DELETE /users/:id](#delete-usersid)
   - [POST /users/:id/restore](#post-usersidrestore)
+- [Country Endpoints](#country-endpoints)
+  - [GET /countries](#get-countries)
+  - [GET /countries/:id](#get-countriesid)
+  - [POST /countries](#post-countries)
+  - [PUT /countries/:id](#put-countriesid)
+  - [DELETE /countries/:id](#delete-countriesid)
+- [Institution Endpoints](#institution-endpoints)
+  - [GET /institutions](#get-institutions)
+  - [GET /institutions/:id](#get-institutionsid)
+  - [POST /institutions](#post-institutions)
+  - [PUT /institutions/:id](#put-institutionsid)
+  - [DELETE /institutions/:id](#delete-institutionsid)
+- [Research Network Endpoints](#research-network-endpoints)
+  - [GET /research-networks](#get-research-networks)
+  - [GET /research-networks/:id](#get-research-networksid)
+  - [POST /research-networks](#post-research-networks)
+  - [PUT /research-networks/:id](#put-research-networksid)
+  - [DELETE /research-networks/:id](#delete-research-networksid)
 - [Password Requirements](#password-requirements)
 - [Roles & Permissions](#roles--permissions)
 - [Token Lifetimes](#token-lifetimes)
@@ -966,6 +984,577 @@ Restore a soft-deleted user.
 
 ---
 
+## Country Endpoints
+
+All country endpoints require authentication. Write operations (POST/PUT/DELETE) require `admin` role.
+
+---
+
+### GET /countries
+
+Retrieve all countries.
+
+**Auth:** Bearer token required  
+**Role:** Any authenticated user
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "Countries retrieved successfully",
+  "data": {
+    "countries": [
+      { "id": 1, "name": "Thailand", "created_at": "2026-03-07T00:00:00.000Z", "updated_at": "2026-03-07T00:00:00.000Z" }
+    ]
+  }
+}
+```
+
+---
+
+### GET /countries/:id
+
+Retrieve a single country by ID.
+
+**Auth:** Bearer token required  
+**Role:** Any authenticated user
+
+**Path Parameter**
+
+| Parameter | Type | Required |
+|---|---|---|
+| `id` | positive integer | ✅ |
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "Country retrieved successfully",
+  "data": {
+    "country": { "id": 1, "name": "Thailand", "created_at": "...", "updated_at": "..." }
+  }
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | `id` is not a positive integer |
+| 401 | `TOKEN_REQUIRED` | No Authorization header |
+| 404 | `NOT_FOUND` | Country does not exist |
+
+---
+
+### POST /countries
+
+Create a new country.
+
+**Auth:** Bearer token required  
+**Role:** `admin`
+
+**Request Body**
+
+| Field | Type | Required | Constraints |
+|---|---|---|---|
+| `name` | string | ✅ | 1–100 characters |
+
+**Example Request**
+```json
+{ "name": "Thailand" }
+```
+
+**Response 201**
+```json
+{
+  "success": true,
+  "message": "Country created successfully",
+  "data": {
+    "country": { "id": 1, "name": "Thailand", "created_at": "...", "updated_at": "..." }
+  }
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | Missing or invalid fields |
+| 401 | `TOKEN_REQUIRED` | No Authorization header |
+| 403 | `FORBIDDEN` | User is not admin |
+| 409 | `CONFLICT` | Country name already exists |
+
+---
+
+### PUT /countries/:id
+
+Update a country name.
+
+**Auth:** Bearer token required  
+**Role:** `admin`
+
+**Path Parameter**
+
+| Parameter | Type | Required |
+|---|---|---|
+| `id` | positive integer | ✅ |
+
+**Request Body**
+
+| Field | Type | Required | Constraints |
+|---|---|---|---|
+| `name` | string | ✅ | 1–100 characters |
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "Country updated successfully",
+  "data": {
+    "country": { "id": 1, "name": "Updated Name", "created_at": "...", "updated_at": "..." }
+  }
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | Missing or invalid fields |
+| 401 | `TOKEN_REQUIRED` | No Authorization header |
+| 403 | `FORBIDDEN` | User is not admin |
+| 404 | `NOT_FOUND` | Country does not exist |
+| 409 | `CONFLICT` | Country name already exists |
+
+---
+
+### DELETE /countries/:id
+
+Delete a country. Fails if any institutions are still linked to it.
+
+**Auth:** Bearer token required  
+**Role:** `admin`
+
+**Path Parameter**
+
+| Parameter | Type | Required |
+|---|---|---|
+| `id` | positive integer | ✅ |
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "Country deleted successfully",
+  "data": null
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 401 | `TOKEN_REQUIRED` | No Authorization header |
+| 403 | `FORBIDDEN` | User is not admin |
+| 404 | `NOT_FOUND` | Country does not exist |
+| 500 | `INTERNAL_ERROR` | Institutions are still linked to this country (FK RESTRICT) |
+
+---
+
+## Institution Endpoints
+
+All institution endpoints require authentication. Write operations (POST/PUT/DELETE) require `admin` role.
+
+---
+
+### GET /institutions
+
+Retrieve a paginated list of institutions. Each record includes the linked `country_name`.
+
+**Auth:** Bearer token required  
+**Role:** Any authenticated user
+
+**Query Parameters**
+
+| Parameter | Type | Default | Constraints |
+|---|---|---|---|
+| `page` | integer | `1` | Min 1 |
+| `limit` | integer | `20` | Min 1, Max 100 |
+
+**Example**
+```
+GET /api/v1/institutions?page=1&limit=20
+```
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "Institutions retrieved successfully",
+  "data": {
+    "items": [
+      {
+        "id": 1,
+        "name": "Chulalongkorn University",
+        "country_id": 1,
+        "country_name": "Thailand",
+        "created_at": "...",
+        "updated_at": "..."
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "limit": 20
+  }
+}
+```
+
+---
+
+### GET /institutions/:id
+
+Retrieve a single institution by ID.
+
+**Auth:** Bearer token required  
+**Role:** Any authenticated user
+
+**Path Parameter**
+
+| Parameter | Type | Required |
+|---|---|---|
+| `id` | positive integer | ✅ |
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "Institution retrieved successfully",
+  "data": {
+    "institution": {
+      "id": 1,
+      "name": "Chulalongkorn University",
+      "country_id": 1,
+      "country_name": "Thailand",
+      "created_at": "...",
+      "updated_at": "..."
+    }
+  }
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | `id` is not a positive integer |
+| 401 | `TOKEN_REQUIRED` | No Authorization header |
+| 404 | `NOT_FOUND` | Institution does not exist |
+
+---
+
+### POST /institutions
+
+Create a new institution.
+
+**Auth:** Bearer token required  
+**Role:** `admin`
+
+**Request Body**
+
+| Field | Type | Required | Constraints |
+|---|---|---|---|
+| `name` | string | ✅ | 1–255 characters |
+| `countryId` | integer | ✅ | Must reference an existing country ID |
+
+**Example Request**
+```json
+{
+  "name": "Chulalongkorn University",
+  "countryId": 1
+}
+```
+
+**Response 201**
+```json
+{
+  "success": true,
+  "message": "Institution created successfully",
+  "data": {
+    "institution": {
+      "id": 1,
+      "name": "Chulalongkorn University",
+      "country_id": 1,
+      "country_name": "Thailand",
+      "created_at": "...",
+      "updated_at": "..."
+    }
+  }
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | Missing or invalid fields |
+| 401 | `TOKEN_REQUIRED` | No Authorization header |
+| 403 | `FORBIDDEN` | User is not admin |
+| 404 | `NOT_FOUND` | `countryId` does not reference a valid country |
+| 409 | `CONFLICT` | Institution with same name already exists in that country |
+
+---
+
+### PUT /institutions/:id
+
+Update an institution. At least one field must be provided.
+
+**Auth:** Bearer token required  
+**Role:** `admin`
+
+**Path Parameter**
+
+| Parameter | Type | Required |
+|---|---|---|
+| `id` | positive integer | ✅ |
+
+**Request Body** *(at least one field required)*
+
+| Field | Type | Constraints |
+|---|---|---|
+| `name` | string | 1–255 characters |
+| `countryId` | integer | Must reference an existing country ID |
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "Institution updated successfully",
+  "data": {
+    "institution": { }
+  }
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | No fields provided or invalid values |
+| 401 | `TOKEN_REQUIRED` | No Authorization header |
+| 403 | `FORBIDDEN` | User is not admin |
+| 404 | `NOT_FOUND` | Institution or country does not exist |
+| 409 | `CONFLICT` | Institution with same name already exists in that country |
+
+---
+
+### DELETE /institutions/:id
+
+Delete an institution permanently.
+
+**Auth:** Bearer token required  
+**Role:** `admin`
+
+**Path Parameter**
+
+| Parameter | Type | Required |
+|---|---|---|
+| `id` | positive integer | ✅ |
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "Institution deleted successfully",
+  "data": null
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 401 | `TOKEN_REQUIRED` | No Authorization header |
+| 403 | `FORBIDDEN` | User is not admin |
+| 404 | `NOT_FOUND` | Institution does not exist |
+
+---
+
+## Research Network Endpoints
+
+All research network endpoints require authentication. Write operations (POST/PUT/DELETE) require `admin` role.
+
+---
+
+### GET /research-networks
+
+Retrieve all research networks.
+
+**Auth:** Bearer token required  
+**Role:** Any authenticated user
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "Research networks retrieved successfully",
+  "data": {
+    "researchNetworks": [
+      { "id": 1, "name": "ASEAN Research Network", "created_at": "...", "updated_at": "..." }
+    ]
+  }
+}
+```
+
+---
+
+### GET /research-networks/:id
+
+Retrieve a single research network by ID.
+
+**Auth:** Bearer token required  
+**Role:** Any authenticated user
+
+**Path Parameter**
+
+| Parameter | Type | Required |
+|---|---|---|
+| `id` | positive integer | ✅ |
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "Research network retrieved successfully",
+  "data": {
+    "researchNetwork": { "id": 1, "name": "ASEAN Research Network", "created_at": "...", "updated_at": "..." }
+  }
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | `id` is not a positive integer |
+| 401 | `TOKEN_REQUIRED` | No Authorization header |
+| 404 | `NOT_FOUND` | Research network does not exist |
+
+---
+
+### POST /research-networks
+
+Create a new research network.
+
+**Auth:** Bearer token required  
+**Role:** `admin`
+
+**Request Body**
+
+| Field | Type | Required | Constraints |
+|---|---|---|---|
+| `name` | string | ✅ | 1–255 characters |
+
+**Example Request**
+```json
+{ "name": "ASEAN Research Network" }
+```
+
+**Response 201**
+```json
+{
+  "success": true,
+  "message": "Research network created successfully",
+  "data": {
+    "researchNetwork": { "id": 1, "name": "ASEAN Research Network", "created_at": "...", "updated_at": "..." }
+  }
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | Missing or invalid fields |
+| 401 | `TOKEN_REQUIRED` | No Authorization header |
+| 403 | `FORBIDDEN` | User is not admin |
+| 409 | `CONFLICT` | Research network name already exists |
+
+---
+
+### PUT /research-networks/:id
+
+Update a research network name.
+
+**Auth:** Bearer token required  
+**Role:** `admin`
+
+**Path Parameter**
+
+| Parameter | Type | Required |
+|---|---|---|
+| `id` | positive integer | ✅ |
+
+**Request Body**
+
+| Field | Type | Required | Constraints |
+|---|---|---|---|
+| `name` | string | ✅ | 1–255 characters |
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "Research network updated successfully",
+  "data": {
+    "researchNetwork": { "id": 1, "name": "Updated Name", "created_at": "...", "updated_at": "..." }
+  }
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | Missing or invalid fields |
+| 401 | `TOKEN_REQUIRED` | No Authorization header |
+| 403 | `FORBIDDEN` | User is not admin |
+| 404 | `NOT_FOUND` | Research network does not exist |
+| 409 | `CONFLICT` | Research network name already exists |
+
+---
+
+### DELETE /research-networks/:id
+
+Delete a research network permanently.
+
+**Auth:** Bearer token required  
+**Role:** `admin`
+
+**Path Parameter**
+
+| Parameter | Type | Required |
+|---|---|---|
+| `id` | positive integer | ✅ |
+
+**Response 200**
+```json
+{
+  "success": true,
+  "message": "Research network deleted successfully",
+  "data": null
+}
+```
+
+**Error Responses**
+
+| Status | Code | Trigger |
+|---|---|---|
+| 401 | `TOKEN_REQUIRED` | No Authorization header |
+| 403 | `FORBIDDEN` | User is not admin |
+| 404 | `NOT_FOUND` | Research network does not exist |
+
+---
+
 ## Password Requirements
 
 All password fields must satisfy:
@@ -993,6 +1582,10 @@ All password fields must satisfy:
 | Create user (`POST /users`) | ❌ | ❌ | ✅ |
 | Delete user | ❌ | ❌ | ✅ |
 | Restore user | ❌ | ❌ | ✅ |
+| View countries / institutions / research networks | ✅ | ✅ | ✅ |
+| Create / update / delete countries | ❌ | ❌ | ✅ |
+| Create / update / delete institutions | ❌ | ❌ | ✅ |
+| Create / update / delete research networks | ❌ | ❌ | ✅ |
 
 ---
 

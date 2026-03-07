@@ -240,6 +240,105 @@ const tableSchemas = {
       { name: 'idx_user_id', columns: ['user_id'] },
       { name: 'idx_expires', columns: ['expires_at'] }
     ]
+  },
+
+  countries: {
+    tableName: 'countries',
+    columns: {
+      id: {
+        type: 'INT',
+        primaryKey: true,
+        autoIncrement: true,
+        nullable: false
+      },
+      name: {
+        type: 'VARCHAR(100)',
+        unique: true,
+        nullable: false
+      },
+      created_at: {
+        type: 'TIMESTAMP',
+        default: 'CURRENT_TIMESTAMP',
+        nullable: false
+      },
+      updated_at: {
+        type: 'TIMESTAMP',
+        default: 'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+        nullable: false
+      }
+    },
+    indexes: [
+      { name: 'idx_country_name', columns: ['name'] }
+    ]
+  },
+
+  institutions: {
+    tableName: 'institutions',
+    columns: {
+      id: {
+        type: 'INT',
+        primaryKey: true,
+        autoIncrement: true,
+        nullable: false
+      },
+      name: {
+        type: 'VARCHAR(255)',
+        nullable: false
+      },
+      country_id: {
+        type: 'INT',
+        nullable: false,
+        foreignKey: {
+          table: 'countries',
+          column: 'id',
+          onDelete: 'RESTRICT'
+        }
+      },
+      created_at: {
+        type: 'TIMESTAMP',
+        default: 'CURRENT_TIMESTAMP',
+        nullable: false
+      },
+      updated_at: {
+        type: 'TIMESTAMP',
+        default: 'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+        nullable: false
+      }
+    },
+    indexes: [
+      { name: 'idx_institution_name', columns: ['name'] },
+      { name: 'idx_institution_country', columns: ['country_id'] }
+    ]
+  },
+
+  research_networks: {
+    tableName: 'research_networks',
+    columns: {
+      id: {
+        type: 'INT',
+        primaryKey: true,
+        autoIncrement: true,
+        nullable: false
+      },
+      name: {
+        type: 'VARCHAR(255)',
+        unique: true,
+        nullable: false
+      },
+      created_at: {
+        type: 'TIMESTAMP',
+        default: 'CURRENT_TIMESTAMP',
+        nullable: false
+      },
+      updated_at: {
+        type: 'TIMESTAMP',
+        default: 'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+        nullable: false
+      }
+    },
+    indexes: [
+      { name: 'idx_research_network_name', columns: ['name'] }
+    ]
   }
 };
 
