@@ -34,7 +34,7 @@ const getPool = () => {
 const query = async (sql, params = []) => {
   try {
     const connection = getPool();
-    const [results] = await connection.execute(sql, params);
+    const [results] = await connection.query(sql, params);
     return results;
   } catch (error) {
     logger.error('Database query error:', {

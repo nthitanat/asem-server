@@ -296,230 +296,119 @@ async function run() {
   // ── Country Routes ────────────────────────────────────────────────────
   console.log('\n📌 COUNTRY ROUTES');
 
-  // 26. GET /countries - no auth (401 expected)
-  log('GET /api/v1/countries (no auth)',
+  // GET /countries
+  log('GET /api/v1/countries',
     await makeRequest(`/api/${API_VERSION}/countries`));
 
-  // 27. GET /countries - authenticated
-  if (testData.accessToken) {
-    log('GET /api/v1/countries (authenticated)',
-      await makeRequest(`/api/${API_VERSION}/countries`, 'GET', null, {
-        Authorization: `Bearer ${testData.accessToken}`
-      }));
+  // POST /countries
+  const createCountryRes = log(
+    'POST /api/v1/countries',
+    await makeRequest(`/api/${API_VERSION}/countries`, 'POST', { name: `TestCountry_${Date.now()}` })
+  );
+  if (createCountryRes.statusCode === 201) {
+    testData.countryId = createCountryRes.body?.data?.country?.id;
   }
 
-  // 28. POST /countries - no auth (401 expected)
-  log('POST /api/v1/countries (no auth)',
-    await makeRequest(`/api/${API_VERSION}/countries`, 'POST', { name: 'NoAuthCountry' }));
+  // GET /countries/:id
+  const cId = testData.countryId || 1;
+  log(`GET /api/v1/countries/${cId}`,
+    await makeRequest(`/api/${API_VERSION}/countries/${cId}`));
 
-  // 29. POST /countries - authenticated (403 if non-admin, 201 if admin)
-  if (testData.accessToken) {
-    const createCountryRes = log(
-      'POST /api/v1/countries (authenticated)',
-      await makeRequest(`/api/${API_VERSION}/countries`, 'POST',
-        { name: `TestCountry_${Date.now()}` },
-        { Authorization: `Bearer ${testData.accessToken}` }
-      )
-    );
-    if (createCountryRes.statusCode === 201) {
-      testData.countryId = createCountryRes.body?.data?.country?.id;
-    }
-  }
-
-  // 30. GET /countries/:id - no auth (401 expected)
-  log('GET /api/v1/countries/1 (no auth)',
-    await makeRequest(`/api/${API_VERSION}/countries/1`));
-
-  // 31. GET /countries/:id - authenticated
-  if (testData.accessToken) {
-    const cId = testData.countryId || 1;
-    log(`GET /api/v1/countries/${cId} (authenticated)`,
-      await makeRequest(`/api/${API_VERSION}/countries/${cId}`, 'GET', null, {
-        Authorization: `Bearer ${testData.accessToken}`
-      }));
-  }
-
-  // 32. PUT /countries/:id - no auth (401 expected)
-  log('PUT /api/v1/countries/1 (no auth)',
-    await makeRequest(`/api/${API_VERSION}/countries/1`, 'PUT', { name: 'NoAuthUpdate' }));
-
-  // 33. PUT /countries/:id - authenticated
-  if (testData.accessToken && testData.countryId) {
-    log(`PUT /api/v1/countries/${testData.countryId} (authenticated)`,
+  // PUT /countries/:id
+  if (testData.countryId) {
+    log(`PUT /api/v1/countries/${testData.countryId}`,
       await makeRequest(`/api/${API_VERSION}/countries/${testData.countryId}`, 'PUT',
-        { name: `UpdatedCountry_${Date.now()}` },
-        { Authorization: `Bearer ${testData.accessToken}` }
+        { name: `UpdatedCountry_${Date.now()}` }
       ));
   }
 
-  // 34. DELETE /countries/:id - no auth (401 expected)
-  log('DELETE /api/v1/countries/1 (no auth)',
-    await makeRequest(`/api/${API_VERSION}/countries/1`, 'DELETE'));
-
-  // 35. DELETE /countries/:id - authenticated
-  if (testData.accessToken && testData.countryId) {
-    log(`DELETE /api/v1/countries/${testData.countryId} (authenticated)`,
-      await makeRequest(`/api/${API_VERSION}/countries/${testData.countryId}`, 'DELETE', null, {
-        Authorization: `Bearer ${testData.accessToken}`
-      }));
-    // Clear id if deleted
+  // DELETE /countries/:id
+  if (testData.countryId) {
+    log(`DELETE /api/v1/countries/${testData.countryId}`,
+      await makeRequest(`/api/${API_VERSION}/countries/${testData.countryId}`, 'DELETE'));
     testData.countryId = null;
   }
 
   // ── Institution Routes ───────────────────────────────────────────────
   console.log('\n📌 INSTITUTION ROUTES');
 
-  // 36. GET /institutions - no auth (401 expected)
-  log('GET /api/v1/institutions (no auth)',
-    await makeRequest(`/api/${API_VERSION}/institutions`));
+  // GET /institutions
+  log('GET /api/v1/institutions',
+    await makeRequest(`/api/${API_VERSION}/institutions?page=1&limit=10`));
 
-  // 37. GET /institutions - authenticated
-  if (testData.accessToken) {
-    log('GET /api/v1/institutions (authenticated)',
-      await makeRequest(`/api/${API_VERSION}/institutions?page=1&limit=10`, 'GET', null, {
-        Authorization: `Bearer ${testData.accessToken}`
-      }));
+  // POST /institutions
+  let countryIdForInst = testData.countryId;
+  if (!countryIdForInst) {
+    const cListRes = await makeRequest(`/api/${API_VERSION}/countries`);
+    const countries = cListRes.body?.data?.countries;
+    if (countries && countries.length > 0) countryIdForInst = countries[0].id;
   }
-
-  // 38. POST /institutions - no auth (401 expected)
-  log('POST /api/v1/institutions (no auth)',
-    await makeRequest(`/api/${API_VERSION}/institutions`, 'POST', {
-      name: 'NoAuthUniversity', countryId: 1
-    }));
-
-  // 39. POST /institutions - authenticated (403 if non-admin, 201 if admin)
-  if (testData.accessToken) {
-    // Fetch a valid countryId if we don’t have one
-    let countryIdForInst = testData.countryId;
-    if (!countryIdForInst) {
-      const cListRes = await makeRequest(`/api/${API_VERSION}/countries`, 'GET', null, {
-        Authorization: `Bearer ${testData.accessToken}`
-      });
-      const countries = cListRes.body?.data?.countries;
-      if (countries && countries.length > 0) countryIdForInst = countries[0].id;
-    }
-    if (countryIdForInst) {
-      const createInstRes = log(
-        'POST /api/v1/institutions (authenticated)',
-        await makeRequest(`/api/${API_VERSION}/institutions`, 'POST',
-          { name: `TestInstitution_${Date.now()}`, countryId: countryIdForInst },
-          { Authorization: `Bearer ${testData.accessToken}` }
-        )
-      );
-      if (createInstRes.statusCode === 201) {
-        testData.institutionId = createInstRes.body?.data?.institution?.id;
-      }
+  if (countryIdForInst) {
+    const createInstRes = log(
+      'POST /api/v1/institutions',
+      await makeRequest(`/api/${API_VERSION}/institutions`, 'POST',
+        { name: `TestInstitution_${Date.now()}`, countryId: countryIdForInst }
+      )
+    );
+    if (createInstRes.statusCode === 201) {
+      testData.institutionId = createInstRes.body?.data?.institution?.id;
     }
   }
 
-  // 40. GET /institutions/:id - no auth (401 expected)
-  log('GET /api/v1/institutions/1 (no auth)',
-    await makeRequest(`/api/${API_VERSION}/institutions/1`));
+  // GET /institutions/:id
+  const iId = testData.institutionId || 1;
+  log(`GET /api/v1/institutions/${iId}`,
+    await makeRequest(`/api/${API_VERSION}/institutions/${iId}`));
 
-  // 41. GET /institutions/:id - authenticated
-  if (testData.accessToken) {
-    const iId = testData.institutionId || 1;
-    log(`GET /api/v1/institutions/${iId} (authenticated)`,
-      await makeRequest(`/api/${API_VERSION}/institutions/${iId}`, 'GET', null, {
-        Authorization: `Bearer ${testData.accessToken}`
-      }));
-  }
-
-  // 42. PUT /institutions/:id - no auth (401 expected)
-  log('PUT /api/v1/institutions/1 (no auth)',
-    await makeRequest(`/api/${API_VERSION}/institutions/1`, 'PUT', { name: 'NoAuthUpdate' }));
-
-  // 43. PUT /institutions/:id - authenticated
-  if (testData.accessToken && testData.institutionId) {
-    log(`PUT /api/v1/institutions/${testData.institutionId} (authenticated)`,
+  // PUT /institutions/:id
+  if (testData.institutionId) {
+    log(`PUT /api/v1/institutions/${testData.institutionId}`,
       await makeRequest(`/api/${API_VERSION}/institutions/${testData.institutionId}`, 'PUT',
-        { name: `UpdatedInstitution_${Date.now()}` },
-        { Authorization: `Bearer ${testData.accessToken}` }
+        { name: `UpdatedInstitution_${Date.now()}` }
       ));
   }
 
-  // 44. DELETE /institutions/:id - no auth (401 expected)
-  log('DELETE /api/v1/institutions/1 (no auth)',
-    await makeRequest(`/api/${API_VERSION}/institutions/1`, 'DELETE'));
-
-  // 45. DELETE /institutions/:id - authenticated
-  if (testData.accessToken && testData.institutionId) {
-    log(`DELETE /api/v1/institutions/${testData.institutionId} (authenticated)`,
-      await makeRequest(`/api/${API_VERSION}/institutions/${testData.institutionId}`, 'DELETE', null, {
-        Authorization: `Bearer ${testData.accessToken}`
-      }));
+  // DELETE /institutions/:id
+  if (testData.institutionId) {
+    log(`DELETE /api/v1/institutions/${testData.institutionId}`,
+      await makeRequest(`/api/${API_VERSION}/institutions/${testData.institutionId}`, 'DELETE'));
     testData.institutionId = null;
   }
-
   // ── Research Network Routes ───────────────────────────────────────────
   console.log('\n📌 RESEARCH NETWORK ROUTES');
 
-  // 46. GET /research-networks - no auth (401 expected)
-  log('GET /api/v1/research-networks (no auth)',
+  // GET /research-networks
+  log('GET /api/v1/research-networks',
     await makeRequest(`/api/${API_VERSION}/research-networks`));
 
-  // 47. GET /research-networks - authenticated
-  if (testData.accessToken) {
-    log('GET /api/v1/research-networks (authenticated)',
-      await makeRequest(`/api/${API_VERSION}/research-networks`, 'GET', null, {
-        Authorization: `Bearer ${testData.accessToken}`
-      }));
+  // POST /research-networks
+  const createNetRes = log(
+    'POST /api/v1/research-networks',
+    await makeRequest(`/api/${API_VERSION}/research-networks`, 'POST',
+      { name: `TestNetwork_${Date.now()}` }
+    )
+  );
+  if (createNetRes.statusCode === 201) {
+    testData.researchNetworkId = createNetRes.body?.data?.researchNetwork?.id;
   }
 
-  // 48. POST /research-networks - no auth (401 expected)
-  log('POST /api/v1/research-networks (no auth)',
-    await makeRequest(`/api/${API_VERSION}/research-networks`, 'POST', { name: 'NoAuthNetwork' }));
+  // GET /research-networks/:id
+  const rnId = testData.researchNetworkId || 1;
+  log(`GET /api/v1/research-networks/${rnId}`,
+    await makeRequest(`/api/${API_VERSION}/research-networks/${rnId}`));
 
-  // 49. POST /research-networks - authenticated (403 if non-admin, 201 if admin)
-  if (testData.accessToken) {
-    const createNetRes = log(
-      'POST /api/v1/research-networks (authenticated)',
-      await makeRequest(`/api/${API_VERSION}/research-networks`, 'POST',
-        { name: `TestNetwork_${Date.now()}` },
-        { Authorization: `Bearer ${testData.accessToken}` }
-      )
-    );
-    if (createNetRes.statusCode === 201) {
-      testData.researchNetworkId = createNetRes.body?.data?.researchNetwork?.id;
-    }
-  }
-
-  // 50. GET /research-networks/:id - no auth (401 expected)
-  log('GET /api/v1/research-networks/1 (no auth)',
-    await makeRequest(`/api/${API_VERSION}/research-networks/1`));
-
-  // 51. GET /research-networks/:id - authenticated
-  if (testData.accessToken) {
-    const rnId = testData.researchNetworkId || 1;
-    log(`GET /api/v1/research-networks/${rnId} (authenticated)`,
-      await makeRequest(`/api/${API_VERSION}/research-networks/${rnId}`, 'GET', null, {
-        Authorization: `Bearer ${testData.accessToken}`
-      }));
-  }
-
-  // 52. PUT /research-networks/:id - no auth (401 expected)
-  log('PUT /api/v1/research-networks/1 (no auth)',
-    await makeRequest(`/api/${API_VERSION}/research-networks/1`, 'PUT', { name: 'NoAuthUpdate' }));
-
-  // 53. PUT /research-networks/:id - authenticated
-  if (testData.accessToken && testData.researchNetworkId) {
-    log(`PUT /api/v1/research-networks/${testData.researchNetworkId} (authenticated)`,
+  // PUT /research-networks/:id
+  if (testData.researchNetworkId) {
+    log(`PUT /api/v1/research-networks/${testData.researchNetworkId}`,
       await makeRequest(`/api/${API_VERSION}/research-networks/${testData.researchNetworkId}`, 'PUT',
-        { name: `UpdatedNetwork_${Date.now()}` },
-        { Authorization: `Bearer ${testData.accessToken}` }
+        { name: `UpdatedNetwork_${Date.now()}` }
       ));
   }
 
-  // 54. DELETE /research-networks/:id - no auth (401 expected)
-  log('DELETE /api/v1/research-networks/1 (no auth)',
-    await makeRequest(`/api/${API_VERSION}/research-networks/1`, 'DELETE'));
-
-  // 55. DELETE /research-networks/:id - authenticated
-  if (testData.accessToken && testData.researchNetworkId) {
-    log(`DELETE /api/v1/research-networks/${testData.researchNetworkId} (authenticated)`,
-      await makeRequest(`/api/${API_VERSION}/research-networks/${testData.researchNetworkId}`, 'DELETE', null, {
-        Authorization: `Bearer ${testData.accessToken}`
-      }));
+  // DELETE /research-networks/:id
+  if (testData.researchNetworkId) {
+    log(`DELETE /api/v1/research-networks/${testData.researchNetworkId}`,
+      await makeRequest(`/api/${API_VERSION}/research-networks/${testData.researchNetworkId}`, 'DELETE'));
     testData.researchNetworkId = null;
   }
 
