@@ -35,8 +35,7 @@ const getInstitutionById = asyncHandler(async (req, res) => {
  * POST /api/v1/institutions
  */
 const createInstitution = asyncHandler(async (req, res) => {
-  const { name, countryId } = req.body;
-  const institution = await institutionService.createInstitution(name, countryId);
+  const institution = await institutionService.createInstitution(req.body);
   return successResponse(res, { institution }, 'Institution created successfully', 201);
 });
 

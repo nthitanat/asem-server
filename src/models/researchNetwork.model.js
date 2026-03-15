@@ -1,11 +1,13 @@
 const { query, queryOne } = require('../utils/db.util');
+const { toCamelCase, toCamelCaseArray } = require('../utils/caseConverter.util');
 
 /**
  * Get all research networks
- * @returns {Promise<Array>}
+ * @returns {Promise<Array>} List of research networks (camelCase)
  */
 const getAllResearchNetworks = async () => {
-  return await query('SELECT * FROM research_networks ORDER BY name ASC');
+  const results = await query('SELECT * FROM research_networks ORDER BY name ASC');
+  return toCamelCaseArray(results);
 };
 
 /**
@@ -20,30 +22,33 @@ const countResearchNetworks = async () => {
 /**
  * Find research network by ID
  * @param {number} id
- * @returns {Promise<Object|null>}
+ * @returns {Promise<Object|null>} Research network (camelCase) or null
  */
 const findResearchNetworkById = async (id) => {
-  return await queryOne('SELECT * FROM research_networks WHERE id = ?', [id]);
+  const result = await queryOne('SELECT * FROM research_networks WHERE id = ?', [id]);
+  return result ? toCamelCase(result) : null;
 };
 
 /**
  * Find research network by name (case-insensitive)
  * @param {string} name
- * @returns {Promise<Object|null>}
+ * @returns {Promise<Object|null>} Research network (camelCase) or null
  */
 const findResearchNetworkByName = async (name) => {
-  return await queryOne(
+  const result = await queryOne(
     'SELECT * FROM research_networks WHERE LOWER(name) = LOWER(?)',
     [name]
   );
+  return result ? toCamelCase(result) : null;
 };
 
 /**
  * Create a new research network
- * @param {string} name
+ * @param {Object} data - { name } (camelCase)
  * @returns {Promise<Object>} Created research network
  */
-const createResearchNetwork = async (name) => {
+const createResearchNetwork = async (data) => {
+  const { name } = data;
   const result = await query(
     'INSERT INTO research_networks (name) VALUES (?)',
     [name]
@@ -54,11 +59,23 @@ const createResearchNetwork = async (name) => {
 /**
  * Update a research network
  * @param {number} id
- * @param {string} name
+ * @param {Object} updates - { name? } (camelCase)
  * @returns {Promise<Object>} Updated research network
  */
-const updateResearchNetwork = async (id, name) => {
-  await query('UPDATE research_networks SET name = ? WHERE id = ?', [name, id]);
+const updateResearchNetwork = async (id, updates) => {
+  const fields = [];
+  const values = [];
+
+  if (updates.name !== undefined) {
+    fields.push('name = ?');
+    values.push(updates.name);
+  }
+
+  if (fields.length > 0) {
+    values.push(id);
+    await query(`UPDATE research_networks SET ${fields.join(', ')} WHERE id = ?`, values);
+  }
+
   return findResearchNetworkById(id);
 };
 

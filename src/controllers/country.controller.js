@@ -25,7 +25,7 @@ const getCountryById = asyncHandler(async (req, res) => {
  * POST /api/v1/countries
  */
 const createCountry = asyncHandler(async (req, res) => {
-  const country = await countryService.createCountry(req.body.name);
+  const country = await countryService.createCountry(req.body);
   return successResponse(res, { country }, 'Country created successfully', 201);
 });
 
@@ -36,7 +36,7 @@ const createCountry = asyncHandler(async (req, res) => {
 const updateCountry = asyncHandler(async (req, res) => {
   const country = await countryService.updateCountry(
     parseInt(req.params.id, 10),
-    req.body.name
+    req.body
   );
   return successResponse(res, { country }, 'Country updated successfully');
 });

@@ -1,11 +1,12 @@
 const { query, queryOne } = require('../utils/db.util');
+const { toCamelCase } = require('../utils/caseConverter.util');
 
 /**
  * Create password reset token
  * @param {number} userId - User ID
  * @param {string} token - Reset token
  * @param {Date} expiresAt - Expiry date
- * @returns {Promise<Object>} Created token info
+ * @returns {Promise<Object>} Created token info (camelCase)
  */
 const createResetToken = async (userId, token, expiresAt) => {
   const sql = `
@@ -15,18 +16,19 @@ const createResetToken = async (userId, token, expiresAt) => {
 
   const result = await query(sql, [userId, token, expiresAt]);
 
-  return {
+  // Return consistent camelCase object
+  return toCamelCase({
     id: result.insertId,
-    userId,
-    token,
-    expiresAt
-  };
+    user_id: userId,
+    token: token,
+    expires_at: expiresAt
+  });
 };
 
 /**
  * Find password reset token
  * @param {string} token - Reset token
- * @returns {Promise<Object|null>} Token info or null
+ * @returns {Promise<Object|null>} Token info (camelCase) or null
  */
 const findResetToken = async (token) => {
   const sql = `
@@ -34,7 +36,8 @@ const findResetToken = async (token) => {
     WHERE token = ? AND used_at IS NULL
   `;
 
-  return await queryOne(sql, [token]);
+  const result = await queryOne(sql, [token]);
+  return result ? toCamelCase(result) : null;
 };
 
 /**

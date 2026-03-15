@@ -1,11 +1,12 @@
 const { query, queryOne } = require('../utils/db.util');
+const { toCamelCase, toCamelCaseArray } = require('../utils/caseConverter.util');
 
 /**
  * Save refresh token to database
  * @param {number} userId - User ID
  * @param {string} token - Refresh token
  * @param {Date} expiresAt - Expiry date
- * @returns {Promise<Object>} Saved token info
+ * @returns {Promise<Object>} Saved token info (camelCase)
  */
 const saveRefreshToken = async (userId, token, expiresAt) => {
   const sql = `
@@ -15,18 +16,19 @@ const saveRefreshToken = async (userId, token, expiresAt) => {
 
   const result = await query(sql, [userId, token, expiresAt]);
 
-  return {
+  // Return consistent camelCase object
+  return toCamelCase({
     id: result.insertId,
-    userId,
-    token,
-    expiresAt
-  };
+    user_id: userId,
+    token: token,
+    expires_at: expiresAt
+  });
 };
 
 /**
  * Find refresh token
  * @param {string} token - Refresh token
- * @returns {Promise<Object|null>} Token info or null
+ * @returns {Promise<Object|null>} Token info (camelCase) or null
  */
 const findRefreshToken = async (token) => {
   const sql = `
@@ -34,7 +36,8 @@ const findRefreshToken = async (token) => {
     WHERE token = ? AND revoked_at IS NULL
   `;
 
-  return await queryOne(sql, [token]);
+  const result = await queryOne(sql, [token]);
+  return result ? toCamelCase(result) : null;
 };
 
 /**
@@ -95,7 +98,7 @@ const deleteExpiredTokens = async () => {
 /**
  * Get all active tokens for a user
  * @param {number} userId - User ID
- * @returns {Promise<Array>} Array of tokens
+ * @returns {Promise<Array>} Array of tokens (camelCase)
  */
 const getUserTokens = async (userId) => {
   const sql = `
@@ -105,7 +108,8 @@ const getUserTokens = async (userId) => {
     ORDER BY created_at DESC
   `;
 
-  return await query(sql, [userId]);
+  const results = await query(sql, [userId]);
+  return toCamelCaseArray(results);
 };
 
 module.exports = {

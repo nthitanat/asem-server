@@ -75,7 +75,7 @@ const login = async (email, password) => {
   }
 
   // Check if user is active
-  if (!user.is_active) {
+  if (!user.isActive) {
     throw new Error('Account is inactive. Please contact support.');
   }
 
@@ -88,7 +88,7 @@ const login = async (email, password) => {
     user,
     accessToken,
     refreshToken,
-    emailVerified: user.email_verified
+    emailVerified: user.emailVerified
   };
 };
 
@@ -155,7 +155,7 @@ const resendVerification = async (email) => {
     return { message: 'If the email exists, a verification link has been sent.' };
   }
 
-  if (user.email_verified) {
+  if (user.emailVerified) {
     throw new Error('Email is already verified');
   }
 
@@ -261,7 +261,7 @@ const changePassword = async (userId, currentPassword, newPassword, currentRefre
 
   // Verify current password
   const bcrypt = require('bcrypt');
-  const isValid = await bcrypt.compare(currentPassword, userWithPassword.password_hash);
+  const isValid = await bcrypt.compare(currentPassword, userWithPassword.passwordHash);
 
   if (!isValid) {
     throw new Error('Current password is incorrect');

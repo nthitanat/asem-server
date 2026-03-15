@@ -1,28 +1,22 @@
 const { query, queryOne } = require('../utils/db.util');
+const { toSnakeCase, toCamelCase, toCamelCaseArray } = require('../utils/caseConverter.util');
 const bcrypt = require('bcrypt');
 
 /**
  * Create new user
- * @param {Object} userData - User data
- * @returns {Promise<Object>} Created user (without password)
+ * @param {Object} userData - User data (camelCase)
+ * @returns {Promise<Object>} Created user (without password, camelCase)
  */
 const createUser = async (userData) => {
-  const {
-    email,
-    username,
-    password,
-    firstName,
-    lastName,
-    bestContactEmail,
-    institutionId,
-    department,
-    areasOfExpertise,
-    countryId,
-    researchNetworkId,
-    fieldOfStudy,
-    role = 'user',
-    emailVerified = false
-  } = userData;
+  // Convert camelCase input to snake_case for database
+  const snakeData = toSnakeCase(userData);
+  
+  // Extract fields with defaults
+  const email = snakeData.email;
+  const username = snakeData.username;
+  const password = snakeData.password;
+  const role = snakeData.role || 'user';
+  const emailVerified = snakeData.email_verified || false;
 
   // Hash password
   const passwordHash = await bcrypt.hash(password, parseInt(process.env.BCRYPT_ROUNDS, 10) || 10);
@@ -39,15 +33,15 @@ const createUser = async (userData) => {
     email,
     username,
     passwordHash,
-    firstName || null,
-    lastName || null,
-    bestContactEmail || null,
-    institutionId || null,
-    department || null,
-    areasOfExpertise || null,
-    countryId || null,
-    researchNetworkId || null,
-    fieldOfStudy || null,
+    snakeData.first_name || null,
+    snakeData.last_name || null,
+    snakeData.best_contact_email || null,
+    snakeData.institution_id || null,
+    snakeData.department || null,
+    snakeData.areas_of_expertise || null,
+    snakeData.country_id || null,
+    snakeData.research_network_id || null,
+    snakeData.field_of_study || null,
     role,
     emailVerified ? 1 : 0
   ]);
@@ -59,7 +53,7 @@ const createUser = async (userData) => {
  * Find user by ID
  * @param {number} id - User ID
  * @param {boolean} includeDeleted - Include soft-deleted users
- * @returns {Promise<Object|null>} User object or null
+ * @returns {Promise<Object|null>} User object (camelCase) or null
  */
 const findUserById = async (id, includeDeleted = false) => {
   let sql = `
@@ -80,11 +74,15 @@ const findUserById = async (id, includeDeleted = false) => {
 
   const user = await queryOne(sql, [id]);
 
-  if (user) {
-    delete user.password_hash;
+  if (!user) {
+    return null;
   }
 
-  return user;
+  // Remove password hash before converting to camelCase
+  delete user.password_hash;
+  
+  // Convert snake_case to camelCase for API response
+  return toCamelCase(user);
 };
 
 /**
@@ -92,7 +90,7 @@ const findUserById = async (id, includeDeleted = false) => {
  * @param {string} email - Email address
  * @param {boolean} includePassword - Include password hash
  * @param {boolean} includeDeleted - Include soft-deleted users
- * @returns {Promise<Object|null>} User object or null
+ * @returns {Promise<Object|null>} User object (camelCase) or null
  */
 const findUserByEmail = async (email, includePassword = false, includeDeleted = false) => {
   let sql = `
@@ -113,18 +111,23 @@ const findUserByEmail = async (email, includePassword = false, includeDeleted = 
 
   const user = await queryOne(sql, [email]);
 
-  if (user && !includePassword) {
+  if (!user) {
+    return null;
+  }
+
+  if (!includePassword) {
     delete user.password_hash;
   }
 
-  return user;
+  // Convert snake_case to camelCase for API response
+  return toCamelCase(user);
 };
 
 /**
  * Find user by username
  * @param {string} username - Username
  * @param {boolean} includeDeleted - Include soft-deleted users
- * @returns {Promise<Object|null>} User object or null
+ * @returns {Promise<Object|null>} User object (camelCase) or null
  */
 const findUserByUsername = async (username, includeDeleted = false) => {
   let sql = 'SELECT * FROM users WHERE username = ?';
@@ -135,11 +138,14 @@ const findUserByUsername = async (username, includeDeleted = false) => {
 
   const user = await queryOne(sql, [username]);
   
-  if (user) {
-    delete user.password_hash;
+  if (!user) {
+    return null;
   }
+
+  delete user.password_hash;
   
-  return user;
+  // Convert snake_case to camelCase for API response
+  return toCamelCase(user);
 };
 
 /**
@@ -147,7 +153,7 @@ const findUserByUsername = async (username, includeDeleted = false) => {
  * @param {number} page - Page number (1-based)
  * @param {number} limit - Items per page
  * @param {boolean} includeDeleted - Include soft-deleted users
- * @returns {Promise<Array>} Array of users
+ * @returns {Promise<Array>} Array of users (camelCase)
  */
 const getAllUsers = async (page = 1, limit = 20, includeDeleted = false) => {
   const offset = (page - 1) * limit;
@@ -172,7 +178,10 @@ const getAllUsers = async (page = 1, limit = 20, includeDeleted = false) => {
 
   sql += ' ORDER BY u.created_at DESC LIMIT ? OFFSET ?';
 
-  return await query(sql, [limit, offset]);
+  const users = await query(sql, [limit, offset]);
+  
+  // Convert array of snake_case objects to camelCase
+  return toCamelCaseArray(users);
 };
 
 /**
@@ -194,10 +203,13 @@ const countUsers = async (includeDeleted = false) => {
 /**
  * Update user
  * @param {number} id - User ID
- * @param {Object} updates - Fields to update
- * @returns {Promise<Object>} Updated user
+ * @param {Object} updates - Fields to update (camelCase)
+ * @returns {Promise<Object>} Updated user (camelCase)
  */
 const updateUser = async (id, updates) => {
+  // Convert camelCase input to snake_case for database
+  const snakeUpdates = toSnakeCase(updates);
+  
   const allowedFields = [
     'email', 'username', 'first_name', 'last_name', 'best_contact_email',
     'institution_id', 'department', 'areas_of_expertise', 'country_id',
@@ -207,7 +219,7 @@ const updateUser = async (id, updates) => {
   const fields = [];
   const values = [];
 
-  for (const [key, value] of Object.entries(updates)) {
+  for (const [key, value] of Object.entries(snakeUpdates)) {
     if (allowedFields.includes(key)) {
       fields.push(`${key} = ?`);
       values.push(value);
@@ -245,7 +257,7 @@ const updatePassword = async (id, newPassword) => {
  * Verify user password
  * @param {string} email - Email address
  * @param {string} password - Password to verify
- * @returns {Promise<Object|null>} User object if password is correct, null otherwise
+ * @returns {Promise<Object|null>} User object (camelCase) if password is correct, null otherwise
  */
 const verifyUserPassword = async (email, password) => {
   const user = await findUserByEmail(email, true, false);
@@ -254,13 +266,14 @@ const verifyUserPassword = async (email, password) => {
     return null;
   }
 
-  const isValid = await bcrypt.compare(password, user.password_hash);
+  // Note: findUserByEmail now returns camelCase, so passwordHash instead of password_hash
+  const isValid = await bcrypt.compare(password, user.passwordHash);
   
   if (!isValid) {
     return null;
   }
 
-  delete user.password_hash;
+  delete user.passwordHash;
   return user;
 };
 

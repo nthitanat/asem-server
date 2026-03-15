@@ -392,9 +392,9 @@ async function testUpdateUserWithFKFields() {
   };
 
   const updateData = {};
-  if (countryId) updateData.country_id = countryId;
-  if (institutionId) updateData.institution_id = institutionId;
-  if (researchNetworkId) updateData.research_network_id = researchNetworkId;
+  if (countryId) updateData.countryId = countryId;
+  if (institutionId) updateData.institutionId = institutionId;
+  if (researchNetworkId) updateData.researchNetworkId = researchNetworkId;
 
   const response = await makeRequest(options, updateData);
   logTest('Update User FK Fields (countryId / institutionId / researchNetworkId)',

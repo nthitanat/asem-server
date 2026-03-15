@@ -262,8 +262,8 @@ Register a new user account. Sends a verification email after registration.
       "id": 4,
       "email": "jane.doe@example.com",
       "username": "janedoe",
-      "first_name": "Jane",
-      "last_name": "Doe"
+      "firstName": "Jane",
+      "lastName": "Doe"
     }
   }
 }
@@ -312,10 +312,10 @@ Authenticate and obtain access + refresh tokens.
       "id": 4,
       "email": "jane.doe@example.com",
       "username": "janedoe",
-      "first_name": "Jane",
-      "last_name": "Doe",
+      "firstName": "Jane",
+      "lastName": "Doe",
       "role": "user",
-      "is_email_verified": false
+      "emailVerified": false
     },
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
@@ -426,10 +426,10 @@ Returns the currently authenticated user's profile.
       "id": 4,
       "email": "jane.doe@example.com",
       "username": "janedoe",
-      "first_name": "Jane",
-      "last_name": "Doe",
+      "firstName": "Jane",
+      "lastName": "Doe",
       "role": "user",
-      "is_email_verified": false
+      "emailVerified": false
     }
   }
 }
@@ -713,12 +713,12 @@ GET /api/v1/users?page=1&limit=20&includeDeleted=false
         "id": 1,
         "email": "admin@example.com",
         "username": "admin",
-        "first_name": "Admin",
-        "last_name": "User",
+        "firstName": "Admin",
+        "lastName": "User",
         "role": "admin",
-        "is_email_verified": true,
-        "is_active": true,
-        "created_at": "2026-01-01T00:00:00.000Z"
+        "emailVerified": true,
+        "isActive": true,
+        "createdAt": "2026-01-01T00:00:00.000Z"
       }
     ],
     "pagination": {
@@ -818,18 +818,18 @@ Retrieve a single user by ID.
       "id": 4,
       "email": "jane.doe@example.com",
       "username": "janedoe",
-      "first_name": "Jane",
-      "last_name": "Doe",
+      "firstName": "Jane",
+      "lastName": "Doe",
       "role": "user",
-      "institution_id": 1,
-      "institution_name": "Chulalongkorn University",
-      "country_id": 1,
-      "country_name": "Thailand",
-      "research_network_id": null,
-      "research_network_name": null,
-      "is_email_verified": true,
-      "is_active": true,
-      "created_at": "2026-03-07T04:54:32.000Z"
+      "institutionId": 1,
+      "institutionName": "Chulalongkorn University",
+      "countryId": 1,
+      "countryName": "Thailand",
+      "researchNetworkId": null,
+      "researchNetworkName": null,
+      "emailVerified": true,
+      "isActive": true,
+      "createdAt": "2026-03-07T04:54:32.000Z"
     }
   }
 }
@@ -1008,7 +1008,7 @@ Retrieve all countries.
   "message": "Countries retrieved successfully",
   "data": {
     "countries": [
-      { "id": 1, "name": "Thailand", "created_at": "2026-03-07T00:00:00.000Z", "updated_at": "2026-03-07T00:00:00.000Z" }
+      { "id": 1, "name": "Thailand", "createdAt": "2026-03-07T00:00:00.000Z", "updatedAt": "2026-03-07T00:00:00.000Z" }
     ]
   }
 }
@@ -1074,7 +1074,7 @@ Create a new country.
   "success": true,
   "message": "Country created successfully",
   "data": {
-    "country": { "id": 1, "name": "Thailand", "created_at": "...", "updated_at": "..." }
+    "country": { "id": 1, "name": "Thailand", "createdAt": "...", "updatedAt": "..." }
   }
 }
 ```
@@ -1115,7 +1115,7 @@ Update a country name.
   "success": true,
   "message": "Country updated successfully",
   "data": {
-    "country": { "id": 1, "name": "Updated Name", "created_at": "...", "updated_at": "..." }
+    "country": { "id": 1, "name": "Updated Name", "createdAt": "...", "updatedAt": "..." }
   }
 }
 ```
@@ -1173,7 +1173,7 @@ All institution endpoints require authentication. Write operations (POST/PUT/DEL
 
 ### GET /institutions
 
-Retrieve a paginated list of institutions. Each record includes the linked `country_name`.
+Retrieve a paginated list of institutions. Each record includes the linked `countryName`.
 
 **Auth:** Bearer token required  
 **Role:** Any authenticated user
@@ -1200,10 +1200,10 @@ GET /api/v1/institutions?page=1&limit=20
       {
         "id": 1,
         "name": "Chulalongkorn University",
-        "country_id": 1,
-        "country_name": "Thailand",
-        "created_at": "...",
-        "updated_at": "..."
+        "countryId": 1,
+        "countryName": "Thailand",
+        "createdAt": "...",
+        "updatedAt": "..."
       }
     ],
     "total": 1,
@@ -1237,10 +1237,10 @@ Retrieve a single institution by ID.
     "institution": {
       "id": 1,
       "name": "Chulalongkorn University",
-      "country_id": 1,
-      "country_name": "Thailand",
-      "created_at": "...",
-      "updated_at": "..."
+      "countryId": 1,
+      "countryName": "Thailand",
+      "createdAt": "...",
+      "updatedAt": "..."
     }
   }
 }
@@ -1287,10 +1287,10 @@ Create a new institution.
     "institution": {
       "id": 1,
       "name": "Chulalongkorn University",
-      "country_id": 1,
-      "country_name": "Thailand",
-      "created_at": "...",
-      "updated_at": "..."
+      "countryId": 1,
+      "countryName": "Thailand",
+      "createdAt": "...",
+      "updatedAt": "..."
     }
   }
 }
@@ -1403,7 +1403,7 @@ Retrieve all research networks.
   "message": "Research networks retrieved successfully",
   "data": {
     "researchNetworks": [
-      { "id": 1, "name": "ASEAN Research Network", "created_at": "...", "updated_at": "..." }
+      { "id": 1, "name": "ASEAN Research Network", "createdAt": "...", "updatedAt": "..." }
     ]
   }
 }
@@ -1430,7 +1430,7 @@ Retrieve a single research network by ID.
   "success": true,
   "message": "Research network retrieved successfully",
   "data": {
-    "researchNetwork": { "id": 1, "name": "ASEAN Research Network", "created_at": "...", "updated_at": "..." }
+    "researchNetwork": { "id": 1, "name": "ASEAN Research Network", "createdAt": "...", "updatedAt": "..." }
   }
 }
 ```
@@ -1469,7 +1469,7 @@ Create a new research network.
   "success": true,
   "message": "Research network created successfully",
   "data": {
-    "researchNetwork": { "id": 1, "name": "ASEAN Research Network", "created_at": "...", "updated_at": "..." }
+    "researchNetwork": { "id": 1, "name": "ASEAN Research Network", "createdAt": "...", "updatedAt": "..." }
   }
 }
 ```
@@ -1510,7 +1510,7 @@ Update a research network name.
   "success": true,
   "message": "Research network updated successfully",
   "data": {
-    "researchNetwork": { "id": 1, "name": "Updated Name", "created_at": "...", "updated_at": "..." }
+    "researchNetwork": { "id": 1, "name": "Updated Name", "createdAt": "...", "updatedAt": "..." }
   }
 }
 ```
@@ -1651,7 +1651,7 @@ Creates a new user account and sends email verification.
       "email": "user@example.com",
       "username": "johndoe",
       "role": "user",
-      "email_verified": false,
+      "emailVerified": false,
       ...
     }
   }
@@ -1984,8 +1984,8 @@ GET /api/v1/users/5
       "id": 5,
       "email": "user@example.com",
       "username": "johndoe",
-      "first_name": "John",
-      "last_name": "Doe",
+      "firstName": "John",
+      "lastName": "Doe",
       ...
     }
   }

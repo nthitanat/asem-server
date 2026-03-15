@@ -37,11 +37,12 @@ const getInstitutionById = async (id) => {
 
 /**
  * Create a new institution
- * @param {string} name
- * @param {number} countryId
+ * @param {Object} data - { name, countryId } (camelCase)
  * @returns {Promise<Object>}
  */
-const createInstitution = async (name, countryId) => {
+const createInstitution = async (data) => {
+  const { name, countryId } = data;
+  
   const country = await countryModel.findCountryById(countryId);
   if (!country) {
     const error = new Error('Country not found');
@@ -56,7 +57,7 @@ const createInstitution = async (name, countryId) => {
     throw error;
   }
 
-  const institution = await institutionModel.createInstitution(name, countryId);
+  const institution = await institutionModel.createInstitution(data);
   logger.info(`Institution created: ${institution.name}`);
   return institution;
 };
@@ -84,7 +85,7 @@ const updateInstitution = async (id, updates) => {
     }
   }
 
-  const resolvedCountryId = updates.countryId ?? institution.country_id;
+  const resolvedCountryId = updates.countryId ?? institution.countryId;
   const resolvedName = updates.name ?? institution.name;
 
   const duplicate = await institutionModel.findInstitutionByNameAndCountry(

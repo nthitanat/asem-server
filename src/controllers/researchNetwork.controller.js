@@ -27,7 +27,7 @@ const getResearchNetworkById = asyncHandler(async (req, res) => {
  * POST /api/v1/research-networks
  */
 const createResearchNetwork = asyncHandler(async (req, res) => {
-  const researchNetwork = await researchNetworkService.createResearchNetwork(req.body.name);
+  const researchNetwork = await researchNetworkService.createResearchNetwork(req.body);
   return successResponse(res, { researchNetwork }, 'Research network created successfully', 201);
 });
 
@@ -38,7 +38,7 @@ const createResearchNetwork = asyncHandler(async (req, res) => {
 const updateResearchNetwork = asyncHandler(async (req, res) => {
   const researchNetwork = await researchNetworkService.updateResearchNetwork(
     parseInt(req.params.id, 10),
-    req.body.name
+    req.body
   );
   return successResponse(res, { researchNetwork }, 'Research network updated successfully');
 });

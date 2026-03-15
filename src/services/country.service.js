@@ -26,10 +26,11 @@ const getCountryById = async (id) => {
 
 /**
  * Create a new country
- * @param {string} name
+ * @param {Object} data - { name }
  * @returns {Promise<Object>}
  */
-const createCountry = async (name) => {
+const createCountry = async (data) => {
+  const { name } = data;
   const existing = await countryModel.findCountryByName(name);
   if (existing) {
     const error = new Error('Country name already exists');
@@ -37,7 +38,7 @@ const createCountry = async (name) => {
     throw error;
   }
 
-  const country = await countryModel.createCountry(name);
+  const country = await countryModel.createCountry(data);
   logger.info(`Country created: ${country.name}`);
   return country;
 };
@@ -45,10 +46,10 @@ const createCountry = async (name) => {
 /**
  * Update a country
  * @param {number} id
- * @param {string} name
+ * @param {Object} updates - { name? }
  * @returns {Promise<Object>}
  */
-const updateCountry = async (id, name) => {
+const updateCountry = async (id, updates) => {
   const country = await countryModel.findCountryById(id);
   if (!country) {
     const error = new Error('Country not found');
@@ -56,6 +57,7 @@ const updateCountry = async (id, name) => {
     throw error;
   }
 
+  const name = updates.name ?? country.name;
   const duplicate = await countryModel.findCountryByName(name);
   if (duplicate && duplicate.id !== id) {
     const error = new Error('Country name already exists');
@@ -63,7 +65,7 @@ const updateCountry = async (id, name) => {
     throw error;
   }
 
-  const updated = await countryModel.updateCountry(id, name);
+  const updated = await countryModel.updateCountry(id, updates);
   logger.info(`Country updated: ${updated.name}`);
   return updated;
 };

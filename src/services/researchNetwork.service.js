@@ -26,10 +26,11 @@ const getResearchNetworkById = async (id) => {
 
 /**
  * Create a new research network
- * @param {string} name
+ * @param {Object} data - { name }
  * @returns {Promise<Object>}
  */
-const createResearchNetwork = async (name) => {
+const createResearchNetwork = async (data) => {
+  const { name } = data;
   const existing = await researchNetworkModel.findResearchNetworkByName(name);
   if (existing) {
     const error = new Error('Research network name already exists');
@@ -37,7 +38,7 @@ const createResearchNetwork = async (name) => {
     throw error;
   }
 
-  const network = await researchNetworkModel.createResearchNetwork(name);
+  const network = await researchNetworkModel.createResearchNetwork(data);
   logger.info(`Research network created: ${network.name}`);
   return network;
 };
@@ -45,10 +46,10 @@ const createResearchNetwork = async (name) => {
 /**
  * Update a research network
  * @param {number} id
- * @param {string} name
+ * @param {Object} updates - { name? }
  * @returns {Promise<Object>}
  */
-const updateResearchNetwork = async (id, name) => {
+const updateResearchNetwork = async (id, updates) => {
   const network = await researchNetworkModel.findResearchNetworkById(id);
   if (!network) {
     const error = new Error('Research network not found');
@@ -56,6 +57,7 @@ const updateResearchNetwork = async (id, name) => {
     throw error;
   }
 
+  const name = updates.name ?? network.name;
   const duplicate = await researchNetworkModel.findResearchNetworkByName(name);
   if (duplicate && duplicate.id !== id) {
     const error = new Error('Research network name already exists');
@@ -63,7 +65,7 @@ const updateResearchNetwork = async (id, name) => {
     throw error;
   }
 
-  const updated = await researchNetworkModel.updateResearchNetwork(id, name);
+  const updated = await researchNetworkModel.updateResearchNetwork(id, updates);
   logger.info(`Research network updated: ${updated.name}`);
   return updated;
 };

@@ -17,7 +17,7 @@ const generateTokenPair = async (user) => {
     email: user.email,
     username: user.username,
     role: user.role,
-    emailVerified: user.email_verified
+    emailVerified: user.emailVerified
   };
 
   const accessToken = generateAccessToken(payload);
@@ -44,17 +44,17 @@ const refreshAccessToken = async (oldRefreshToken) => {
   }
 
   // Check if expired
-  if (isTokenExpired(tokenRecord.expires_at)) {
+  if (isTokenExpired(tokenRecord.expiresAt)) {
     throw new Error('Refresh token has expired');
   }
 
   // Generate new token pair
   const payload = {
-    id: tokenRecord.user_id
+    id: tokenRecord.userId
   };
 
   const accessToken = generateAccessToken({
-    id: tokenRecord.user_id,
+    id: tokenRecord.userId,
     // Note: In production, you should fetch fresh user data here
     // to ensure role/email changes are reflected
   });
@@ -63,12 +63,12 @@ const refreshAccessToken = async (oldRefreshToken) => {
 
   // Save new refresh token
   const expiresAt = getExpiryDate(jwtConfig.refreshTokenExpiry);
-  await refreshTokenModel.saveRefreshToken(tokenRecord.user_id, refreshToken, expiresAt);
+  await refreshTokenModel.saveRefreshToken(tokenRecord.userId, refreshToken, expiresAt);
 
   // Revoke old refresh token (rotation)
   await refreshTokenModel.revokeRefreshToken(oldRefreshToken, refreshToken);
 
-  logger.info(`Refresh token rotated for user ${tokenRecord.user_id}`);
+  logger.info(`Refresh token rotated for user ${tokenRecord.userId}`);
 
   return { accessToken, refreshToken };
 };
@@ -104,14 +104,14 @@ const verifyEmailToken = async (token) => {
     throw new Error('Invalid verification token');
   }
 
-  if (isTokenExpired(tokenRecord.expires_at)) {
+  if (isTokenExpired(tokenRecord.expiresAt)) {
     throw new Error('Verification token has expired');
   }
 
   // Mark token as used
   await emailVerificationModel.markTokenAsUsed(token);
 
-  return tokenRecord.user_id;
+  return tokenRecord.userId;
 };
 
 /**
@@ -145,11 +145,11 @@ const verifyPasswordResetToken = async (token) => {
     throw new Error('Invalid reset token');
   }
 
-  if (isTokenExpired(tokenRecord.expires_at)) {
+  if (isTokenExpired(tokenRecord.expiresAt)) {
     throw new Error('Reset token has expired');
   }
 
-  return tokenRecord.user_id;
+  return tokenRecord.userId;
 };
 
 /**

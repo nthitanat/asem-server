@@ -130,7 +130,7 @@ const restoreUser = async (id) => {
     throw new Error('User not found');
   }
 
-  if (!user.deleted_at) {
+  if (!user.deletedAt) {
     throw new Error('User is not deleted');
   }
 
