@@ -273,13 +273,6 @@ const changePassword = async (userId, currentPassword, newPassword, currentRefre
   // Revoke all other refresh tokens (keep current session)
   await tokenService.revokeAllUserTokens(userId, currentRefreshToken);
 
-  // Send confirmation email
-  try {
-    await emailService.sendPasswordChangedEmail(user);
-  } catch (error) {
-    logger.error('Failed to send password changed email:', error.message);
-  }
-
   logger.info(`Password changed for user: ${user.username}`);
 
   return { message: 'Password changed successfully' };
