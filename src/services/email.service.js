@@ -3,9 +3,24 @@ const emailConfig = require('../config/email.config');
 const logger = require('../utils/logger.util');
 
 /**
- * Create email transporter
+ * Create email transporter.
+ * Uses Gmail OAuth2 (HTTPS, port 443) when GMAIL_REFRESH_TOKEN is set — bypasses SMTP firewall.
+ * Falls back to SMTP transport for local dev (MailDev).
  */
 const createTransporter = () => {
+  if (emailConfig.gmail.refreshToken) {
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        type: 'OAuth2',
+        user: emailConfig.gmail.user,
+        clientId: emailConfig.gmail.clientId,
+        clientSecret: emailConfig.gmail.clientSecret,
+        refreshToken: emailConfig.gmail.refreshToken
+      }
+    });
+  }
+
   return nodemailer.createTransport({
     host: emailConfig.host,
     port: emailConfig.port,
