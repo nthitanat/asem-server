@@ -1,5 +1,5 @@
-const { query, queryOne } = require('./src/utils/db.util');
-const { toCamelCase } = require('./src/utils/caseConverter.util');
+const { query, queryOne } = require('../utils/db.util');
+const { toCamelCase } = require('../utils/caseConverter.util');
 
 /**
  * Create email verification token
@@ -35,7 +35,8 @@ const findVerificationToken = async (token) => {
     WHERE token = ? AND used_at IS NULL
   `;
 
-  return await queryOne(sql, [token]).then(row => row ? toCamelCase(row) : null);
+  const row = await queryOne(sql, [token]);
+  return row ? toCamelCase(row) : null;
 };
 
 /**

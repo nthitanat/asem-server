@@ -1,7 +1,7 @@
 const { generateAccessToken, generateRefreshToken, getExpiryDate } = require('../utils/jwt.util');
 const { generateSecureToken, getTokenExpiry, isTokenExpired } = require('../utils/token.util');
 const refreshTokenModel = require('../models/refreshToken.model');
-const emailVerificationModel = require('../../emailVerification.model');
+const emailVerificationModel = require('../models/emailVerification.model');
 const passwordResetModel = require('../models/passwordReset.model');
 const jwtConfig = require('../config/jwt.config');
 const logger = require('../utils/logger.util');

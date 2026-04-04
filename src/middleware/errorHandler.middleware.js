@@ -26,6 +26,10 @@ const errorHandler = (err, req, res, next) => {
     return errorResponse(res, 'Duplicate entry found', 409, 'DUPLICATE_ENTRY');
   }
 
+  if (err.message === 'Invalid verification token' || err.message === 'Verification token has expired') {
+    return errorResponse(res, err.message, 400, 'INVALID_VERIFICATION_TOKEN');
+  }
+
   if (err.message.includes('Token')) {
     return errorResponse(res, err.message, 401, 'TOKEN_ERROR');
   }
