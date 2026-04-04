@@ -1,6 +1,6 @@
 # General Architecture Documentation
 
-**Last Updated**: March 15, 2026  
+**Last Updated**: April 4, 2026  
 **Purpose**: Comprehensive guide to the Node.js/Express API architecture  
 **Audience**: Future developers and AI assistants working with this codebase
 
@@ -10,9 +10,9 @@
 
 1. [Architecture Overview](#architecture-overview)
 2. [Layer Responsibilities](#layer-responsibilities)
-3. [Data Flow Patterns](#data-flow-patterns)
-4. [Case Conversion System](#case-conversion-system)
-5. [Standard Patterns by Layer](#standard-patterns-by-layer)
+3. [Config Files](#config-files-srcconfigjs)
+4. [Data Flow Patterns](#data-flow-patterns)
+5. [Case Conversion System](#case-conversion-system)
 6. [Naming Conventions](#naming-conventions)
 7. [Error Handling](#error-handling)
 8. [Adding New Resources](#adding-new-resources)
@@ -97,24 +97,44 @@ const { authenticateToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/role.middleware');
 const { resourceSchema } = require('../validators/resource.validator');
 
-// Endpoint with middleware chain
+// Protected admin endpoint
 router.post(
   '/',
   authenticateToken,           // 1. Authenticate
-  requireRole(['admin']),      // 2. Authorize
-  validate(resourceSchema),    // 3. Validate
-  resourceController.create    // 4. Handle request
+  requireEmailVerified,        // 2. Verify email
+  requireRole(['admin']),      // 3. Authorize
+  validate(resourceSchema),    // 4. Validate
+  resourceController.create    // 5. Handle request
+);
+
+// Owner-or-admin endpoint (validate params BEFORE ownership check)
+router.put(
+  '/:id',
+  authenticateToken,
+  requireEmailVerified,
+  validate(idParamSchema, 'params'),   // validate first so param is parsed
+  validate(updateSchema, 'body'),
+  requireOwnerOrAdmin('id'),           // reads req.params.id
+  resourceController.update
 );
 
 module.exports = router;
 ```
 
-**Middleware Execution Order**:
-1. Authentication (`authenticateToken`)
-2. Authorization (`requireRole`, `requireOwnerOrAdmin`)
-3. Email verification (`requireEmailVerified`)
-4. Validation (`validate`)
-5. Controller method
+**Middleware Execution Order** (protected routes):
+1. Rate limiting (auth routes only — `authLimiter`, `passwordResetLimiter`, etc.)
+2. Authentication (`authenticateToken`)
+3. Email verification (`requireEmailVerified`) — currently only applied in user routes
+4. Authorization (`requireRole` / `requireAdmin` / `requireOwnerOrAdmin`)
+5. Validation (`validate`)
+6. Controller method
+
+> **Note on owner-check routes**: When `requireOwnerOrAdmin` is used, param validation (`validate(idParamSchema, 'params')`) runs **before** the ownership check because it needs `req.params.id` to be parsed.
+
+**Public routes** (no authentication):
+Some endpoints skip authentication entirely:
+- `GET /countries`, `GET /institutions`, `GET /research-networks` — public list endpoints
+- Auth public endpoints: register, login, verify-email, forgot-password, reset-password, refresh-token
 
 ---
 
@@ -129,13 +149,16 @@ module.exports = router;
 - Must run FIRST on protected routes
 
 #### `role.middleware.js`
-- `requireRole(['admin', 'moderator'])` - Check user role
-- `requireOwnerOrAdmin('userId')` - Allow owner or admin
-- Depends on `authenticateToken` running first
+- `requireRole(roles)` - Factory; check user role against allowed list
+- `requireAdmin` - Shorthand for `requireRole(['admin'])`; used by country, institution, researchNetwork routes
+- `requireAdminOrModerator` - Shorthand for `requireRole(['admin', 'moderator'])`
+- `requireOwnerOrAdmin(paramName)` - Allow owner or admin/moderator (reads `req.params[paramName]`)
+- All depend on `authenticateToken` running first
 
 #### `emailVerified.middleware.js`
 - `requireEmailVerified` - Blocks unverified email users
 - Depends on `authenticateToken` running first
+- **Currently only applied in user routes** — country, institution, and researchNetwork admin routes do not enforce it
 
 #### `validate.middleware.js`
 - `validate(schema, 'body')` - Validates with Joi schema
@@ -143,7 +166,16 @@ module.exports = router;
 - Strips unknown fields automatically
 
 #### `rateLimiter.middleware.js`
-- Rate limiting (configured per environment)
+Exports four rate limiters (runs **before** validation on auth routes). All values are read from environment variables with sensible defaults — **`.env` files are the single source of truth** for rate limit configuration.
+
+| Limiter | Env vars (window / max) | Defaults | Applies to |
+|---------|------------------------|----------|------------|
+| `apiLimiter` | `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX_REQUESTS` | 15 min / 100 | General API (not currently mounted on routes) |
+| `authLimiter` | `AUTH_RATE_LIMIT_WINDOW_MS` / `AUTH_RATE_LIMIT_MAX_REQUESTS` | 15 min / 10 (skips successful) | register, login |
+| `passwordResetLimiter` | `PASSWORD_RESET_RATE_LIMIT_WINDOW_MS` / `PASSWORD_RESET_RATE_LIMIT_MAX_REQUESTS` | 1 hour / 3 | forgot-password |
+| `emailVerificationLimiter` | `EMAIL_VERIFICATION_RATE_LIMIT_WINDOW_MS` / `EMAIL_VERIFICATION_RATE_LIMIT_MAX_REQUESTS` | 1 hour / 5 | resend-verification |
+
+All return `429` with the standard `errorResponse` format
 
 #### `errorHandler.middleware.js`
 - `asyncHandler()` - Wraps async controllers, catches errors
@@ -236,6 +268,41 @@ password: Joi.string()
   .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/)
   .required()
 ```
+
+**Shared / Reusable Schema Patterns**:
+
+Several validators export common schemas that are reused across resources:
+
+```javascript
+// ID parameter validation (country, institution, researchNetwork, user validators)
+const idParamSchema = Joi.object({
+  id: Joi.number().integer().positive().required()
+});
+
+// Pagination query validation (institution, user validators)
+const paginationQuerySchema = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20),
+  includeDeleted: Joi.boolean().default(false)  // user validator only
+});
+
+// Delete query validation (user validator)
+const deleteQuerySchema = Joi.object({
+  hard: Joi.boolean().default(false)            // soft vs hard delete
+});
+```
+
+**Auth Validator Schemas** (`auth.validator.js`):
+
+| Schema | Fields | Used for |
+|--------|--------|----------|
+| `registerSchema` | email, username, password, firstName, lastName, bestContactEmail, institutionId, department, areasOfExpertise, countryId, researchNetworkId, fieldOfStudy | `POST /auth/register` |
+| `loginSchema` | email, password | `POST /auth/login` |
+| `refreshTokenSchema` | refreshToken | `POST /auth/refresh-token` |
+| `emailSchema` | email | Resend verification / forgot password |
+| `resetPasswordSchema` | token, newPassword | `POST /auth/reset-password` |
+| `changePasswordSchema` | currentPassword, newPassword | `POST /auth/change-password` |
+| `verifyTokenQuerySchema` | token (query param) | `GET /auth/verify-email?token=...` |
 
 ---
 
@@ -356,6 +423,8 @@ errorResponse(res, message, statusCode, code, details)
 - ❌ **DON'T**: Extract individual fields from `req.body`
 - ❌ **DON'T**: Put business logic in controllers
 - ❌ **DON'T**: Call models directly
+
+> **Known exception**: `auth.controller.js` `login` extracts `{ email, password }` from `req.body` and passes them as individual arguments to `authService.login(email, password)`. This deviates from the "pass entire object" rule — new controllers should still pass `req.body` as a single object.
 
 ---
 
@@ -518,9 +587,7 @@ module.exports = {
 - ✅ **DO**: Log important business events
 - ✅ **DO**: Throw descriptive errors
 - ✅ **DO**: Work with camelCase objects
-- ❌ **DON'T**: Handle HTTP responses
-- ❌ **DON'T**: Access `req` or `res` objects
-- ❌ **DON'T**: Write SQL queries
+  - ✅ **DO**: Use `beginTransaction()` / `commit()` / `rollback()` from `db.util.js` for multi-step writes
 
 ---
 
@@ -747,22 +814,106 @@ validationErrorResponse(res, errors)
 
 #### `db.util.js`
 ```javascript
-query(sql, params)       // Execute query, return array
-queryOne(sql, params)    // Execute query, return single object
+initializePool()             // Create mysql2 connection pool (called once at startup)
+getPool()                    // Return pool instance (lazy-initializes if needed)
+query(sql, params)           // Execute query, return array
+queryOne(sql, params)        // Execute query, return single object
+beginTransaction()           // Get connection with transaction started; returns connection
+commit(connection)           // Commit transaction and release connection
+rollback(connection)         // Rollback transaction and release connection
+ensureDatabaseExists()       // Auto-create database if missing (called at startup)
+testConnection()             // Run SELECT 1 to verify DB connectivity
+closePool()                  // End the pool and set it to null (graceful shutdown)
 ```
 
 #### `logger.util.js`
+Winston-backed logger. Writes to console (colorized in dev) + `logs/error.log` + `logs/combined.log` (5 MB rotation, 5 files max). Level is `debug` in development, `info` in production.
 ```javascript
-logger.info(message)     // Info level
-logger.warn(message)     // Warning level
-logger.error(message)    // Error level
+logger.info(message)                // Info level
+logger.warn(message)                // Warning level
+logger.error(message)               // Error level
+logger.debug(message)               // Debug level (development only)
+logger.info(message, { key: val })  // Structured metadata as second argument
 ```
 
 #### `jwt.util.js`
 ```javascript
-generateToken(payload, expiresIn)
-verifyToken(token)
+generateAccessToken(payload)        // Access token; expiry read from jwt.config.js
+generateRefreshToken(payload)       // Refresh token; expiry read from jwt.config.js
+verifyToken(token)                  // Verify & decode; throws if invalid or expired
+decodeToken(token)                  // Decode without verification (inspection only)
+getExpiryDate(expiresIn)            // Convert '15m'/'7d' string → Date object
 ```
+
+#### `token.util.js`
+Generates and manages **non-JWT** tokens (email verification, password reset).
+```javascript
+generateSecureToken(bytes)          // crypto.randomBytes hex token (default 32 bytes)
+getTokenExpiry(seconds)             // Returns Date of now + N seconds
+isTokenExpired(expiryDate)          // Returns true if expiry Date is in the past
+hashString(data)                    // SHA256 hex hash; use for storing tokens securely
+```
+
+#### `validation.util.js`
+Lower-level validation helpers used alongside Joi schemas.
+```javascript
+isValidEmail(email)                 // Regex email check, returns boolean
+isValidUsername(username)           // Alphanumeric/underscore/hyphen, 3–30 chars
+validatePasswordStrength(password)  // Returns { valid: boolean, message: string }
+sanitizeInput(input)                // Trim + strip < > to prevent XSS
+formatJoiErrors(joiError)           // Normalize Joi error → [{ field, message }]
+```
+
+#### `tableSync.util.js`
+Reads `src/config/tableSchemas.js` and auto-creates/verifies tables at server startup. **Not called directly in application code** — only invoked in `server.js`.
+```javascript
+syncAllTables()              // Creates or verifies all tables defined in tableSchemas.js
+syncTable(tableName, schema) // Sync a single table (create or alter)
+tableExists(tableName)       // Check whether a table exists in the current database
+```
+
+**Key behaviours**:
+- **Topological sort** — resolves FK-dependency order via Kahn's algorithm (with circular-dependency fallback).
+- **Interactive confirmation** — prompts before CREATE TABLE or ADD COLUMN; auto-confirms in production or non-TTY environments.
+- **Missing FK detection** — detects existing columns that lack a declared foreign key constraint and offers to add them.
+- **Type mismatch warnings** — warns when a column's DB type differs from the schema (requires manual ALTER).
+- **Extra column warnings** — warns about DB columns not present in the schema (never auto-drops them).
+
+---
+
+## Config Files (`src/config/`)
+
+**Purpose**: Centralize environment-specific settings; loaded once at startup.
+
+| File | What it does |
+|------|-------------|
+| `env.config.js` | Loads `.env.<NODE_ENV>` (e.g. `.env.development`, `.env.production`). Must be `require`d **first** in `server.js`. Exports `{ nodeEnv, isProduction, isDevelopment, isTest }`. |
+| `db.config.js` | MySQL connection pool settings (host, port, credentials, charset `utf8mb4`, collation `utf8mb4_unicode_ci`). Notable defaults: `connectionLimit: 20`, `multipleStatements: false` (security — prevents stacked-query SQL injection), `enableKeepAlive: true`. Consumed by `db.util.js`. |
+| `jwt.config.js` | JWT `secret`, `accessTokenExpiry`, `refreshTokenExpiry` from env vars, plus static `issuer: 'asem-server'` and `audience: 'asem-client'` (both are embedded in tokens and validated by `verifyToken`). Consumed by `jwt.util.js`. |
+| `email.config.js` | SMTP host/port/auth settings, `from.email` / `from.name` (sender identity), `frontendUrl` (base URL for verification/reset links), and `verification.enabled` flag (`EMAIL_VERIFICATION_ENABLED`). Consumed by `email.service.js`. |
+| `tableSchemas.js` | Declarative table definitions. Consumed by `tableSync.util.js` at startup. **Add new tables here — not as raw SQL.** |
+
+**Environment file naming convention** (loaded by `env.config.js`):
+```
+.env.development   ← NODE_ENV=development
+.env.production    ← NODE_ENV=production
+.env.test          ← NODE_ENV=test
+```
+
+**Environment Variables Reference** (rate limiting):
+
+All rate limit values are configured in `.env` files — the middleware reads them via `process.env` with fallback defaults.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `RATE_LIMIT_WINDOW_MS` | API limiter window (ms) | `900000` (15 min) |
+| `RATE_LIMIT_MAX_REQUESTS` | API limiter max requests per window | `100` |
+| `AUTH_RATE_LIMIT_WINDOW_MS` | Auth limiter window (ms) | `900000` (15 min) |
+| `AUTH_RATE_LIMIT_MAX_REQUESTS` | Auth limiter max requests (skips successful) | `10` |
+| `PASSWORD_RESET_RATE_LIMIT_WINDOW_MS` | Password reset limiter window (ms) | `3600000` (1 hour) |
+| `PASSWORD_RESET_RATE_LIMIT_MAX_REQUESTS` | Password reset limiter max requests | `3` |
+| `EMAIL_VERIFICATION_RATE_LIMIT_WINDOW_MS` | Email verification limiter window (ms) | `3600000` (1 hour) |
+| `EMAIL_VERIFICATION_RATE_LIMIT_MAX_REQUESTS` | Email verification limiter max requests | `5` |
 
 ---
 
@@ -1155,25 +1306,35 @@ Located in `src/middleware/errorHandler.middleware.js`:
 
 Follow this checklist when adding a new resource (e.g., "products"):
 
-### 1. Database Table
+### 1. Database Table (`src/config/tableSchemas.js`)
 
-```sql
-CREATE TABLE products (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  name VARCHAR(255) NOT NULL,
-  category_id INT,
-  is_active BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  deleted_at TIMESTAMP NULL,
-  
-  FOREIGN KEY (category_id) REFERENCES categories(id),
-  INDEX idx_name (name),
-  INDEX idx_deleted (deleted_at)
-);
+**Do NOT write raw SQL.** Add a new entry to `src/config/tableSchemas.js`. The `tableSync.util.js` utility reads this file at server startup and auto-creates or verifies the table in FK-dependency order.
+
+```javascript
+// In src/config/tableSchemas.js → tableSchemas object
+products: {
+  tableName: 'products',
+  columns: {
+    id:          { type: 'INT', primaryKey: true, autoIncrement: true, nullable: false },
+    name:        { type: 'VARCHAR(255)', nullable: false },
+    category_id: { type: 'INT', nullable: true,
+                   foreignKey: { table: 'categories', column: 'id', onDelete: 'SET NULL' } },
+    is_active:   { type: 'BOOLEAN', default: 'true', nullable: false },
+    created_at:  { type: 'TIMESTAMP', default: 'CURRENT_TIMESTAMP', nullable: false },
+    updated_at:  { type: 'TIMESTAMP', default: 'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP', nullable: false },
+    deleted_at:  { type: 'TIMESTAMP', nullable: true, default: 'NULL' }
+  },
+  indexes: [
+    { name: 'idx_product_name', columns: ['name'] },
+    { name: 'idx_deleted',      columns: ['deleted_at'] }
+  ]
+}
 ```
 
-**Note**: Use snake_case for all column names!
+**Rules**:
+- Use snake_case for all column names
+- Declare `foreignKey` for FK columns — creation order is resolved automatically
+- `tableSync` will `ADD COLUMN` for new columns added to existing tables
 
 ### 2. Model (`src/models/product.model.js`)
 
@@ -1283,6 +1444,21 @@ module.exports = router;
 const productRoutes = require('./product.routes');
 
 router.use('/products', productRoutes);
+```
+
+### 8. Non-CRUD Actions
+
+For actions beyond standard CRUD (e.g., restore a soft-deleted resource), use `POST /:id/<action>`:
+
+```javascript
+// Restore soft-deleted user (admin only) — from user.routes.js
+router.post(
+  '/:id/restore',
+  requireEmailVerified,
+  requireRole(['admin']),
+  validate(userIdParamSchema, 'params'),
+  userController.restoreUser
+);
 ```
 
 ### Testing Checklist
@@ -1419,14 +1595,28 @@ router.post(
 );
 ```
 
-**CORRECT**:
+**CORRECT** (admin-only route):
 ```javascript
 router.post(
   '/',
   authenticateToken,       // ✅ 1. Authenticate first
-  requireRole(['admin']),  // ✅ 2. Then check role
-  validate(schema),        // ✅ 3. Then validate
-  controller.create        // ✅ 4. Finally handle
+  requireEmailVerified,    // ✅ 2. Check email verified
+  requireRole(['admin']),  // ✅ 3. Then check role
+  validate(schema),        // ✅ 4. Then validate
+  controller.create        // ✅ 5. Finally handle
+);
+```
+
+**CORRECT** (owner-or-admin route — validate params before ownership check):
+```javascript
+router.put(
+  '/:id',
+  authenticateToken,            // ✅ 1. Authenticate
+  requireEmailVerified,         // ✅ 2. Check email verified
+  validate(idSchema, 'params'), // ✅ 3. Validate params first
+  validate(bodySchema, 'body'), // ✅ 4. Validate body
+  requireOwnerOrAdmin('id'),    // ✅ 5. Check ownership (needs parsed param)
+  controller.update             // ✅ 6. Handle
 );
 ```
 
@@ -1499,6 +1689,7 @@ const findByName = async (name) => {
 
 | When you... | Do this... |
 |------------|-----------|
+| Add new table | Add entry to `tableSchemas.js`; `tableSync` auto-creates it at startup |
 | Add new endpoint | Create route → validator → controller → service → model |
 | Accept input | Validate with Joi in camelCase |
 | Call model | Pass object, receive camelCase back |
@@ -1509,7 +1700,7 @@ const findByName = async (name) => {
 
 ### File Creation Order (New Resource)
 
-1. Database table (snake_case)
+1. `tableSchemas.js` entry (snake_case columns, FK declarations)
 2. Model (with case conversion)
 3. Validator (camelCase schemas)
 4. Service (business logic)
