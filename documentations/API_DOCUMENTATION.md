@@ -1,116 +1,66 @@
-# ASEM API Documentation
+# ASEM Server — API Documentation
 
-**Base URL:** `https://engagement.chula.ac.th/asem-api`  
-**API Version:** `v1`  
-**API Prefix:** `/api/v1`  
-**Last Tested:** 2026-03-07
+**Last Updated**: April 4, 2026  
+**API Version**: v1
+
+---
+
+## Base URLs
+
+| Environment | Base URL |
+|-------------|----------|
+| **Production** | `https://engagement.chula.ac.th/asem-api/api/v1` |
+| **Development** | `http://localhost:5001/api/v1` |
+
+> All endpoints below are relative to the Base URL unless otherwise stated.
 
 ---
 
 ## Table of Contents
 
-- [Base URL & Versioning](#base-url--versioning)
-- [Authentication](#authentication)
-- [Response Format](#response-format)
-- [Error Codes](#error-codes)
-- [Rate Limiting](#rate-limiting)
-- [Health Endpoints](#health-endpoints)
-- [Auth Endpoints](#auth-endpoints)
-  - [POST /auth/register](#post-authregister)
-  - [POST /auth/login](#post-authlogin)
-  - [POST /auth/logout](#post-authlogout)
-  - [POST /auth/refresh-token](#post-authrefresh-token)
-  - [GET /auth/me](#get-authme)
-  - [POST /auth/change-password](#post-authchange-password)
-  - [GET /auth/verify-email](#get-authverify-email)
-  - [POST /auth/resend-verification](#post-authresend-verification)
-  - [POST /auth/forgot-password](#post-authforgot-password)
-  - [GET /auth/verify-reset-token](#get-authverify-reset-token)
-  - [POST /auth/reset-password](#post-authreset-password)
-- [User Endpoints](#user-endpoints)
-  - [GET /users](#get-users)
-  - [POST /users](#post-users)
-  - [GET /users/:id](#get-usersid)
-  - [PUT /users/:id](#put-usersid)
-  - [DELETE /users/:id](#delete-usersid)
-  - [POST /users/:id/restore](#post-usersidrestore)
-- [Country Endpoints](#country-endpoints)
-  - [GET /countries](#get-countries)
-  - [GET /countries/:id](#get-countriesid)
-  - [POST /countries](#post-countries)
-  - [PUT /countries/:id](#put-countriesid)
-  - [DELETE /countries/:id](#delete-countriesid)
-- [Institution Endpoints](#institution-endpoints)
-  - [GET /institutions](#get-institutions)
-  - [GET /institutions/:id](#get-institutionsid)
-  - [POST /institutions](#post-institutions)
-  - [PUT /institutions/:id](#put-institutionsid)
-  - [DELETE /institutions/:id](#delete-institutionsid)
-- [Research Network Endpoints](#research-network-endpoints)
-  - [GET /research-networks](#get-research-networks)
-  - [GET /research-networks/:id](#get-research-networksid)
-  - [POST /research-networks](#post-research-networks)
-  - [PUT /research-networks/:id](#put-research-networksid)
-  - [DELETE /research-networks/:id](#delete-research-networksid)
-- [Password Requirements](#password-requirements)
-- [Roles & Permissions](#roles--permissions)
-- [Token Lifetimes](#token-lifetimes)
-- [Known Issues](#known-issues)
-
----
-
-## Base URL & Versioning
-
-| Environment | Base URL |
-|---|---|
-| Production | `https://engagement.chula.ac.th/asem-api` |
-| API v1 prefix | `https://engagement.chula.ac.th/asem-api/api/v1` |
-
-All API endpoints below are relative to the **API v1 prefix** unless otherwise noted.
-
----
-
-## Authentication
-
-Protected endpoints require a JWT access token passed in the `Authorization` header:
-
-```
-Authorization: Bearer <access_token>
-```
-
-Tokens are obtained via [POST /auth/login](#post-authlogin) or [POST /auth/refresh-token](#post-authrefresh-token).
-
-Access tokens are **short-lived** (15 minutes). Use the refresh token to obtain a new access token before expiry. Each refresh rotates both tokens — the old refresh token is revoked.
+1. [Response Format](#response-format)
+2. [Authentication](#authentication)
+3. [Error Codes](#error-codes)
+4. [Rate Limiting](#rate-limiting)
+5. [Endpoints](#endpoints)
+   - [Health Check](#health-check)
+   - [Auth](#auth)
+   - [Users](#users)
+   - [Countries](#countries)
+   - [Institutions](#institutions)
+   - [Research Networks](#research-networks)
+   - [Announcements](#announcements)
+   - [Discussions](#discussions)
+6. [Static Files](#static-files)
+7. [Quick Reference — All Endpoints](#quick-reference--all-endpoints)
 
 ---
 
 ## Response Format
 
-All responses follow a consistent envelope format.
-
-### Success
+### Success Response
 
 ```json
 {
   "success": true,
-  "message": "Operation description",
-  "data": { }
+  "message": "Descriptive success message",
+  "data": { ... }
 }
 ```
 
-### Success (Paginated)
+### Paginated Response
 
 ```json
 {
   "success": true,
-  "message": "Users retrieved successfully",
+  "message": "Items retrieved successfully",
   "data": {
-    "items": [ ],
+    "items": [ ... ],
     "pagination": {
       "page": 1,
       "limit": 20,
-      "total": 100,
-      "pages": 5,
+      "total": 50,
+      "pages": 3,
       "hasNext": true,
       "hasPrev": false
     }
@@ -118,278 +68,303 @@ All responses follow a consistent envelope format.
 }
 ```
 
-### Error
+### Error Response
 
 ```json
 {
   "success": false,
   "error": {
-    "message": "Human-readable error description",
-    "code": "ERROR_CODE",
+    "message": "Descriptive error message",
+    "code": "ERROR_CODE"
+  }
+}
+```
+
+### Validation Error Response
+
+```json
+{
+  "success": false,
+  "error": {
+    "message": "Validation failed",
+    "code": "VALIDATION_ERROR",
     "details": [
-      { "field": "email", "message": "Please provide a valid email address" }
+      {
+        "field": "email",
+        "message": "Please provide a valid email address"
+      }
     ]
   }
 }
 ```
 
-> `details` is only present on validation errors (HTTP 400).
+---
+
+## Authentication
+
+Protected endpoints require a **Bearer token** in the `Authorization` header:
+
+```
+Authorization: Bearer <access_token>
+```
+
+- **Access tokens** are short-lived JWTs.
+- **Refresh tokens** are long-lived and used to obtain new access tokens.
+- Tokens include `issuer: "asem-server"` and `audience: "asem-client"` claims.
+
+### Roles
+
+| Role | Description |
+|------|-------------|
+| `user` | Default role. Standard access. |
+| `moderator` | Can manage announcements and view users. |
+| `admin` | Full access to all resources. |
 
 ---
 
 ## Error Codes
 
-| HTTP | Code | Meaning |
-|---|---|---|
-| 400 | `VALIDATION_ERROR` | Request body / query failed validation |
-| 400 | `INVALID_TOKEN` | Token is malformed, expired, or not found |
-| 401 | `TOKEN_REQUIRED` | Authorization header is missing |
-| 401 | `INVALID_TOKEN` | Access token is invalid or expired |
-| 401 | `INVALID_CREDENTIALS` | Wrong email or password |
-| 403 | `FORBIDDEN` | Authenticated but lacks required role |
-| 403 | `EMAIL_NOT_VERIFIED` | Account email has not been verified |
-| 404 | `NOT_FOUND` | Resource does not exist |
-| 409 | `CONFLICT` | Duplicate email or username |
-| 429 | `RATE_LIMIT_EXCEEDED` | Too many requests |
-| 429 | `AUTH_RATE_LIMIT_EXCEEDED` | Too many auth attempts |
-| 429 | `PASSWORD_RESET_RATE_LIMIT_EXCEEDED` | Too many password reset requests |
-| 429 | `EMAIL_VERIFICATION_RATE_LIMIT_EXCEEDED` | Too many verification emails requested |
-| 500 | `INTERNAL_ERROR` | Unexpected server error |
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `VALIDATION_ERROR` | 400 | Request body/query/params validation failed |
+| `UNAUTHORIZED` | 401 | Missing or invalid authentication token |
+| `AUTH_ERROR` | 401 | Invalid credentials (email/password) |
+| `TOKEN_ERROR` | 401 | Token expired, invalid, or revoked |
+| `INVALID_TOKEN` | 400 | Reset/verification token invalid |
+| `ACCOUNT_INACTIVE` | 403 | User account is deactivated |
+| `EMAIL_NOT_VERIFIED` | 403 | Email verification required |
+| `FORBIDDEN` | 403 | Insufficient permissions |
+| `NOT_FOUND` | 404 | Resource or route not found |
+| `EMAIL_EXISTS` | 409 | Email already registered |
+| `USERNAME_EXISTS` | 409 | Username already taken |
+| `DUPLICATE_ENTRY` | 409 | Generic duplicate entry |
+| `TOO_MANY_REQUESTS` | 429 | Rate limit exceeded |
+| `INTERNAL_ERROR` | 500 | Unexpected server error |
 
 ---
 
 ## Rate Limiting
 
-| Applies To | Window | Max Requests | Notes |
-|---|---|---|---|
-| General API | 15 min | 100 | Per IP |
-| `POST /auth/register`, `POST /auth/login` | 15 min | 10 | Successful requests not counted |
-| `POST /auth/forgot-password` | 1 hour | 3 | Per IP |
-| `POST /auth/resend-verification` | 1 hour | 5 | Per IP |
+| Scope | Window | Max Requests | Applied To |
+|-------|--------|-------------|------------|
+| General API | 15 min | 100 | All `/api` routes |
+| Auth (register, login) | 15 min | 10 (skips successful) | `POST /auth/register`, `POST /auth/login` |
+| Password Reset | 1 hour | 3 | `POST /auth/forgot-password` |
+| Email Verification | 1 hour | 5 | `POST /auth/resend-verification` |
 
-Rate limit information is returned in `RateLimit-*` response headers.
+Rate-limited responses return `429 Too Many Requests`:
 
----
-
-## Health Endpoints
-
-### GET /health
-
-Basic server health check. No authentication required.
-
-**URL:** `GET https://engagement.chula.ac.th/asem-api/health`
-
-**Response 200**
 ```json
 {
-  "success": true,
-  "message": "Server is healthy",
-  "data": {
-    "uptime": 1172293.897,
-    "timestamp": "2026-03-07T04:54:32.491Z"
+  "success": false,
+  "error": {
+    "message": "Too many requests, please try again later.",
+    "code": "TOO_MANY_REQUESTS"
   }
 }
 ```
 
 ---
 
-### GET /api/v1/health
+## Endpoints
 
-API version health check. No authentication required.
+---
 
-**URL:** `GET https://engagement.chula.ac.th/asem-api/api/v1/health`
+### Health Check
 
-**Response 200**
+#### `GET /health`
+
+> **Note**: This is relative to the root URL (`https://engagement.chula.ac.th/asem-api/health` or `http://localhost:5001/health`), not the API base.
+
+**Auth**: None
+
+**Response** `200 OK`:
+```json
+{
+  "success": true,
+  "message": "Server is healthy",
+  "data": {
+    "uptime": 12345.678,
+    "timestamp": "2026-04-04T12:00:00.000Z"
+  }
+}
+```
+
+#### `GET /api/v1/health`
+
+**Auth**: None
+
+**Response** `200 OK`:
 ```json
 {
   "success": true,
   "message": "API is healthy",
   "data": {
     "version": "v1",
-    "uptime": 1172293.909,
-    "timestamp": "2026-03-07T04:54:32.503Z"
+    "uptime": 12345.678,
+    "timestamp": "2026-04-04T12:00:00.000Z"
   }
 }
 ```
 
 ---
 
-## Auth Endpoints
+### Auth
 
-### POST /auth/register
+#### `POST /auth/register`
 
-Register a new user account. Sends a verification email after registration.
+Register a new user account.
 
-**Rate limit:** 10 requests / 15 min per IP (failed only)
+**Auth**: None  
+**Rate Limit**: `authLimiter` (15 min / 10 requests)
 
-**Request Body**
+**Request Body** (`application/json`):
 
-| Field | Type | Required | Constraints |
-|---|---|---|---|
-| `email` | string | ✅ | Valid email format |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | ✅ | Valid email address |
 | `username` | string | ✅ | Alphanumeric, 3–30 characters |
-| `password` | string | ✅ | Min 8 chars, must contain uppercase, lowercase, number, and special char (`@$!%*?&`) |
-| `firstName` | string | ❌ | Max 100 chars |
-| `lastName` | string | ❌ | Max 100 chars |
-| `bestContactEmail` | string | ❌ | Valid email format |
-| `institutionId` | integer | ❌ | Must reference an existing institution ID |
-| `department` | string | ❌ | Max 255 chars |
-| `areasOfExpertise` | string | ❌ | Max 1000 chars |
-| `countryId` | integer | ❌ | Must reference an existing country ID |
-| `researchNetworkId` | integer | ❌ | Must reference an existing research network ID |
-| `fieldOfStudy` | string | ❌ | Max 255 chars |
+| `password` | string | ✅ | Min 8 chars, must include uppercase, lowercase, digit, special char (`@$!%*?&`) |
+| `firstName` | string | ❌ | Max 100 characters |
+| `lastName` | string | ❌ | Max 100 characters |
+| `bestContactEmail` | string | ❌ | Valid email |
+| `institutionId` | integer | ❌ | Positive integer (valid institution ID) |
+| `department` | string | ❌ | Max 255 characters |
+| `areasOfExpertise` | string | ❌ | Max 1000 characters |
+| `countryId` | integer | ❌ | Positive integer (valid country ID) |
+| `researchNetworkId` | integer | ❌ | Positive integer (valid research network ID) |
+| `fieldOfStudy` | string | ❌ | Max 255 characters |
 
-**Example Request**
+**Example Request**:
 ```json
 {
-  "email": "jane.doe@example.com",
-  "username": "janedoe",
-  "password": "Secure@1234",
-  "firstName": "Jane",
+  "email": "john.doe@example.com",
+  "username": "johndoe",
+  "password": "SecurePass1!",
+  "firstName": "John",
   "lastName": "Doe",
   "institutionId": 1,
-  "countryId": 1
+  "countryId": 5,
+  "researchNetworkId": 2,
+  "department": "Computer Science",
+  "fieldOfStudy": "Artificial Intelligence"
 }
 ```
 
-**Response 201**
+**Response** `201 Created`:
 ```json
 {
   "success": true,
-  "message": "Registration successful. You can now log in.",
+  "message": "Registration successful. Please check your email to verify your account.",
   "data": {
     "user": {
-      "id": 4,
-      "email": "jane.doe@example.com",
-      "username": "janedoe",
-      "firstName": "Jane",
-      "lastName": "Doe"
-    }
+      "id": 10,
+      "email": "john.doe@example.com",
+      "username": "johndoe",
+      "firstName": "John",
+      "lastName": "Doe",
+      "bestContactEmail": null,
+      "institutionId": 1,
+      "department": "Computer Science",
+      "areasOfExpertise": null,
+      "countryId": 5,
+      "researchNetworkId": 2,
+      "fieldOfStudy": "Artificial Intelligence",
+      "role": "user",
+      "emailVerified": false,
+      "isActive": true,
+      "createdAt": "2026-04-04T12:00:00.000Z",
+      "updatedAt": "2026-04-04T12:00:00.000Z"
+    },
+    "message": "Registration successful. Please check your email to verify your account."
   }
 }
 ```
 
-**Error Responses**
+**Error Responses**:
 
-| Status | Code | Trigger |
-|---|---|---|
-| 400 | `VALIDATION_ERROR` | Missing required fields or invalid format |
-| 409 | `CONFLICT` | Email or username already in use |
-| 429 | `AUTH_RATE_LIMIT_EXCEEDED` | Rate limit hit |
-
-> ⚠️ **Known Issue:** Duplicate email/username currently returns **500** instead of **409**. Fix pending.
+| Status | Code | Description |
+|--------|------|-------------|
+| `409` | `EMAIL_EXISTS` | Email already registered |
+| `409` | `USERNAME_EXISTS` | Username already taken |
+| `400` | `VALIDATION_ERROR` | Invalid input fields |
 
 ---
 
-### POST /auth/login
+#### `POST /auth/login`
 
-Authenticate and obtain access + refresh tokens.
+Authenticate a user and receive tokens.
 
-**Rate limit:** 10 requests / 15 min per IP (failed only)
+**Auth**: None  
+**Rate Limit**: `authLimiter` (15 min / 10 requests)
 
-**Request Body**
+**Request Body** (`application/json`):
 
-| Field | Type | Required |
-|---|---|---|
-| `email` | string | ✅ |
-| `password` | string | ✅ |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | ✅ | Registered email address |
+| `password` | string | ✅ | Account password |
 
-**Example Request**
+**Example Request**:
 ```json
 {
-  "email": "jane.doe@example.com",
-  "password": "Secure@1234"
+  "email": "john.doe@example.com",
+  "password": "SecurePass1!"
 }
 ```
 
-**Response 200**
+**Response** `200 OK`:
 ```json
 {
   "success": true,
   "message": "Login successful",
   "data": {
     "user": {
-      "id": 4,
-      "email": "jane.doe@example.com",
-      "username": "janedoe",
-      "firstName": "Jane",
+      "id": 10,
+      "email": "john.doe@example.com",
+      "username": "johndoe",
+      "firstName": "John",
       "lastName": "Doe",
       "role": "user",
-      "emailVerified": false
+      "emailVerified": true,
+      "isActive": true
     },
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "emailVerified": true
   }
 }
 ```
 
-**Error Responses**
+**Error Responses**:
 
-| Status | Code | Trigger |
-|---|---|---|
-| 400 | `VALIDATION_ERROR` | Missing fields |
-| 401 | `INVALID_CREDENTIALS` | Wrong email or password |
-| 429 | `AUTH_RATE_LIMIT_EXCEEDED` | Rate limit hit |
-
-> ⚠️ **Known Issue:** Wrong password currently returns **500** instead of **401**. Fix pending.
+| Status | Code | Description |
+|--------|------|-------------|
+| `401` | `AUTH_ERROR` | Invalid email or password |
+| `403` | `ACCOUNT_INACTIVE` | Account is deactivated |
 
 ---
 
-### POST /auth/logout
+#### `POST /auth/refresh-token`
 
-Invalidate the current refresh token. Requires authentication.
+Obtain a new access token using a refresh token.
 
-**Auth:** Bearer token required
+**Auth**: None
 
-**Request Body**
+**Request Body** (`application/json`):
 
-| Field | Type | Required |
-|---|---|---|
-| `refreshToken` | string | ✅ |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `refreshToken` | string | ✅ | Valid, non-expired refresh token |
 
-**Example Request**
+**Example Request**:
 ```json
 {
   "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
 ```
 
-**Response 200**
-```json
-{
-  "success": true,
-  "message": "Logged out successfully",
-  "data": null
-}
-```
-
-**Error Responses**
-
-| Status | Code | Trigger |
-|---|---|---|
-| 400 | `VALIDATION_ERROR` | Missing `refreshToken` |
-| 401 | `TOKEN_REQUIRED` | No Authorization header |
-
----
-
-### POST /auth/refresh-token
-
-Exchange a valid refresh token for a new access token. Old refresh token is revoked (rotation).
-
-**Request Body**
-
-| Field | Type | Required |
-|---|---|---|
-| `refreshToken` | string | ✅ |
-
-**Example Request**
-```json
-{
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-**Response 200**
+**Response** `200 OK`:
 ```json
 {
   "success": true,
@@ -401,145 +376,102 @@ Exchange a valid refresh token for a new access token. Old refresh token is revo
 }
 ```
 
-**Error Responses**
+**Error Responses**:
 
-| Status | Code | Trigger |
-|---|---|---|
-| 400 | `VALIDATION_ERROR` | Missing `refreshToken` |
-| 400 | `INVALID_TOKEN` | Refresh token expired or not found |
-
----
-
-### GET /auth/me
-
-Returns the currently authenticated user's profile.
-
-**Auth:** Bearer token required
-
-**Response 200**
-```json
-{
-  "success": true,
-  "message": "User data retrieved",
-  "data": {
-    "user": {
-      "id": 4,
-      "email": "jane.doe@example.com",
-      "username": "janedoe",
-      "firstName": "Jane",
-      "lastName": "Doe",
-      "role": "user",
-      "emailVerified": false
-    }
-  }
-}
-```
-
-**Error Responses**
-
-| Status | Code | Trigger |
-|---|---|---|
-| 401 | `TOKEN_REQUIRED` | No Authorization header |
-| 401 | `INVALID_TOKEN` | Token expired or invalid |
+| Status | Code | Description |
+|--------|------|-------------|
+| `401` | `TOKEN_ERROR` | Refresh token expired, revoked, or invalid |
 
 ---
 
-### POST /auth/change-password
+#### `POST /auth/logout`
 
-Change password for the currently authenticated user. Invalidates all existing refresh tokens.
+Revoke the refresh token to log out.
 
-**Auth:** Bearer token required
+**Auth**: 🔒 Bearer Token
 
-**Request Body**
+**Request Body** (`application/json`):
 
-| Field | Type | Required | Constraints |
-|---|---|---|---|
-| `currentPassword` | string | ✅ | Must match current password |
-| `newPassword` | string | ✅ | Min 8 chars, complexity required |
-| `refreshToken` | string | ❌ | Optionally revoke the current session token |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `refreshToken` | string | ✅ | The refresh token to revoke |
 
-**Example Request**
+**Example Request**:
 ```json
 {
-  "currentPassword": "OldPass@123",
-  "newPassword": "NewSecure@456"
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
 ```
 
-**Response 200**
+**Response** `200 OK`:
 ```json
 {
   "success": true,
-  "message": "Password changed successfully",
+  "message": "Logged out successfully",
   "data": null
 }
 ```
 
-**Error Responses**
-
-| Status | Code | Trigger |
-|---|---|---|
-| 400 | `VALIDATION_ERROR` | Missing or invalid fields |
-| 401 | `TOKEN_REQUIRED` | No Authorization header |
-| 401 | `INVALID_CREDENTIALS` | Wrong current password |
-
 ---
 
-### GET /auth/verify-email
+#### `GET /auth/verify-email`
 
-Verify a user's email address using a one-time token sent by email.
+Verify email address using the token sent via email.
 
-**Query Parameters**
+**Auth**: None
 
-| Parameter | Type | Required |
-|---|---|---|
-| `token` | string | ✅ |
+**Query Parameters**:
 
-**Example**
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `token` | string | ✅ | Email verification token |
+
+**Example Request**:
 ```
-GET /api/v1/auth/verify-email?token=<verification_token>
+GET /auth/verify-email?token=abc123def456...
 ```
 
-**Response 200**
+**Response** `200 OK`:
 ```json
 {
   "success": true,
   "message": "Email verified successfully",
-  "data": null
+  "data": {
+    "message": "Email verified successfully"
+  }
 }
 ```
 
-**Error Responses**
+**Error Responses**:
 
-| Status | Code | Trigger |
-|---|---|---|
-| 400 | `VALIDATION_ERROR` | Missing `token` query param |
-| 400 | `INVALID_TOKEN` | Token expired or invalid |
-
-> ⚠️ **Known Issue:** Invalid token format currently returns **500**. Fix pending.
+| Status | Code | Description |
+|--------|------|-------------|
+| `400` | `VALIDATION_ERROR` | Token missing |
+| `401` | `TOKEN_ERROR` | Token invalid or expired |
 
 ---
 
-### POST /auth/resend-verification
+#### `POST /auth/resend-verification`
 
-Resend the email verification link to a registered email address.
+Resend the email verification link.
 
-**Rate limit:** 5 requests / hour per IP
+**Auth**: None  
+**Rate Limit**: `emailVerificationLimiter` (1 hour / 5 requests)
 
-**Request Body**
+**Request Body** (`application/json`):
 
-| Field | Type | Required |
-|---|---|---|
-| `email` | string | ✅ |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | ✅ | Registered email address |
 
-**Example Request**
+**Example Request**:
 ```json
 {
-  "email": "jane.doe@example.com"
+  "email": "john.doe@example.com"
 }
 ```
 
-**Response 200**
+**Response** `200 OK`:
 ```json
 {
   "success": true,
@@ -548,72 +480,59 @@ Resend the email verification link to a registered email address.
 }
 ```
 
-**Error Responses**
-
-| Status | Code | Trigger |
-|---|---|---|
-| 400 | `VALIDATION_ERROR` | Invalid email format |
-| 429 | `EMAIL_VERIFICATION_RATE_LIMIT_EXCEEDED` | Rate limit hit |
-
-> ⚠️ **Known Issue:** Currently returns **500** — SMTP service not configured on production server.
-
 ---
 
-### POST /auth/forgot-password
+#### `POST /auth/forgot-password`
 
-Request a password reset email. Always returns success to prevent email enumeration.
+Request a password reset email.
 
-**Rate limit:** 3 requests / hour per IP
+**Auth**: None  
+**Rate Limit**: `passwordResetLimiter` (1 hour / 3 requests)
 
-**Request Body**
+**Request Body** (`application/json`):
 
-| Field | Type | Required |
-|---|---|---|
-| `email` | string | ✅ |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | ✅ | Registered email address |
 
-**Example Request**
+**Example Request**:
 ```json
 {
-  "email": "jane.doe@example.com"
+  "email": "john.doe@example.com"
 }
 ```
 
-**Response 200**
+**Response** `200 OK`:
 ```json
 {
   "success": true,
-  "message": "If an account with that email exists, a password reset link has been sent.",
+  "message": "If the email exists, a password reset link has been sent.",
   "data": null
 }
 ```
 
-**Error Responses**
-
-| Status | Code | Trigger |
-|---|---|---|
-| 400 | `VALIDATION_ERROR` | Invalid email format |
-| 429 | `PASSWORD_RESET_RATE_LIMIT_EXCEEDED` | Rate limit hit |
-
-> ⚠️ **Known Issue:** Currently returns **500** — SMTP service not configured on production server.
+> The response is intentionally identical whether the email exists or not (to prevent user enumeration).
 
 ---
 
-### GET /auth/verify-reset-token
+#### `GET /auth/verify-reset-token`
 
-Check whether a password reset token is still valid before showing the reset form.
+Check whether a password reset token is still valid.
 
-**Query Parameters**
+**Auth**: None
 
-| Parameter | Type | Required |
-|---|---|---|
-| `token` | string | ✅ |
+**Query Parameters**:
 
-**Example**
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `token` | string | ✅ | Password reset token |
+
+**Example Request**:
 ```
-GET /api/v1/auth/verify-reset-token?token=<reset_token>
+GET /auth/verify-reset-token?token=abc123def456...
 ```
 
-**Response 200** (valid token)
+**Response** `200 OK` (valid token):
 ```json
 {
   "success": true,
@@ -624,12 +543,12 @@ GET /api/v1/auth/verify-reset-token?token=<reset_token>
 }
 ```
 
-**Response 400** (invalid / expired token)
+**Response** `400 Bad Request` (invalid token):
 ```json
 {
   "success": false,
   "error": {
-    "message": "Invalid reset token",
+    "message": "Token is invalid or has expired",
     "code": "INVALID_TOKEN"
   }
 }
@@ -637,26 +556,28 @@ GET /api/v1/auth/verify-reset-token?token=<reset_token>
 
 ---
 
-### POST /auth/reset-password
+#### `POST /auth/reset-password`
 
-Reset a user's password using the token received by email. All sessions are terminated after reset.
+Reset password using the reset token.
 
-**Request Body**
+**Auth**: None
 
-| Field | Type | Required | Constraints |
-|---|---|---|---|
-| `token` | string | ✅ | Valid reset token from email |
-| `newPassword` | string | ✅ | Min 8 chars, complexity required |
+**Request Body** (`application/json`):
 
-**Example Request**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `token` | string | ✅ | Password reset token |
+| `newPassword` | string | ✅ | New password (min 8 chars, uppercase, lowercase, digit, special char) |
+
+**Example Request**:
 ```json
 {
-  "token": "<reset_token>",
-  "newPassword": "NewSecure@456"
+  "token": "abc123def456...",
+  "newPassword": "NewSecure1!"
 }
 ```
 
-**Response 200**
+**Response** `200 OK`:
 ```json
 {
   "success": true,
@@ -665,44 +586,123 @@ Reset a user's password using the token received by email. All sessions are term
 }
 ```
 
-**Error Responses**
+**Error Responses**:
 
-| Status | Code | Trigger |
-|---|---|---|
-| 400 | `VALIDATION_ERROR` | Missing or invalid fields |
-| 400 | `INVALID_TOKEN` | Token expired, used, or not found |
-
----
-
-## User Endpoints
-
-All user endpoints require:
-- **Authentication:** `Authorization: Bearer <access_token>`
-- **Email verified:** The account's email must be verified
+| Status | Code | Description |
+|--------|------|-------------|
+| `401` | `TOKEN_ERROR` | Token invalid or expired |
+| `400` | `VALIDATION_ERROR` | Password doesn't meet requirements |
 
 ---
 
-### GET /users
+#### `POST /auth/change-password`
 
-Retrieve a paginated list of all users.
+Change password for the currently authenticated user.
 
-**Auth:** Bearer token required  
-**Role:** `admin` or `moderator`
+**Auth**: 🔒 Bearer Token
 
-**Query Parameters**
+**Request Body** (`application/json`):
 
-| Parameter | Type | Default | Constraints |
-|---|---|---|---|
-| `page` | integer | `1` | Min 1 |
-| `limit` | integer | `20` | Min 1, Max 100 |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `currentPassword` | string | ✅ | Current account password |
+| `newPassword` | string | ✅ | New password (min 8 chars, uppercase, lowercase, digit, special char) |
+
+**Example Request**:
+```json
+{
+  "currentPassword": "OldSecure1!",
+  "newPassword": "NewSecure2@"
+}
+```
+
+**Response** `200 OK`:
+```json
+{
+  "success": true,
+  "message": "Password changed successfully",
+  "data": null
+}
+```
+
+**Error Responses**:
+
+| Status | Code | Description |
+|--------|------|-------------|
+| `401` | `AUTH_ERROR` | Current password incorrect |
+| `400` | `VALIDATION_ERROR` | New password doesn't meet requirements |
+
+---
+
+#### `GET /auth/me`
+
+Retrieve the currently authenticated user's profile.
+
+**Auth**: 🔒 Bearer Token
+
+**Example Request**:
+```
+GET /auth/me
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Response** `200 OK`:
+```json
+{
+  "success": true,
+  "message": "User data retrieved",
+  "data": {
+    "user": {
+      "id": 10,
+      "email": "john.doe@example.com",
+      "username": "johndoe",
+      "firstName": "John",
+      "lastName": "Doe",
+      "bestContactEmail": null,
+      "institutionId": 1,
+      "department": "Computer Science",
+      "areasOfExpertise": null,
+      "countryId": 5,
+      "researchNetworkId": 2,
+      "fieldOfStudy": "Artificial Intelligence",
+      "role": "user",
+      "emailVerified": true,
+      "isActive": true,
+      "createdAt": "2026-04-04T12:00:00.000Z",
+      "updatedAt": "2026-04-04T12:00:00.000Z"
+    }
+  }
+}
+```
+
+---
+
+### Users
+
+> All user endpoints require authentication. Most require email verification.
+
+#### `GET /users`
+
+List all users with pagination. **Admin & Moderator only.**
+
+**Auth**: 🔒 Bearer Token (admin, moderator)  
+**Email Verified**: ✅ Required
+
+**Query Parameters**:
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `page` | integer | `1` | Page number (≥ 1) |
+| `limit` | integer | `20` | Items per page (1–100) |
 | `includeDeleted` | boolean | `false` | Include soft-deleted users |
 
-**Example**
+**Example Request**:
 ```
-GET /api/v1/users?page=1&limit=20&includeDeleted=false
+GET /users?page=1&limit=10&includeDeleted=false
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
-**Response 200**
+**Response** `200 OK`:
 ```json
 {
   "success": true,
@@ -715,300 +715,378 @@ GET /api/v1/users?page=1&limit=20&includeDeleted=false
         "username": "admin",
         "firstName": "Admin",
         "lastName": "User",
+        "bestContactEmail": null,
+        "institutionId": 1,
+        "department": "IT",
+        "areasOfExpertise": null,
+        "countryId": 1,
+        "researchNetworkId": null,
+        "fieldOfStudy": null,
         "role": "admin",
         "emailVerified": true,
         "isActive": true,
-        "createdAt": "2026-01-01T00:00:00.000Z"
+        "deletedAt": null,
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "updatedAt": "2026-01-01T00:00:00.000Z"
+      },
+      {
+        "id": 2,
+        "email": "john.doe@example.com",
+        "username": "johndoe",
+        "firstName": "John",
+        "lastName": "Doe",
+        "bestContactEmail": "john.personal@gmail.com",
+        "institutionId": 1,
+        "department": "Computer Science",
+        "areasOfExpertise": "AI, Machine Learning",
+        "countryId": 5,
+        "researchNetworkId": 2,
+        "fieldOfStudy": "Artificial Intelligence",
+        "role": "user",
+        "emailVerified": true,
+        "isActive": true,
+        "deletedAt": null,
+        "createdAt": "2026-01-15T08:30:00.000Z",
+        "updatedAt": "2026-03-20T14:00:00.000Z"
       }
     ],
     "pagination": {
       "page": 1,
-      "limit": 20,
-      "total": 1,
-      "pages": 1,
-      "hasNext": false,
+      "limit": 10,
+      "total": 25,
+      "pages": 3,
+      "hasNext": true,
       "hasPrev": false
     }
   }
 }
 ```
 
-**Error Responses**
-
-| Status | Code | Trigger |
-|---|---|---|
-| 401 | `TOKEN_REQUIRED` | No Authorization header |
-| 403 | `FORBIDDEN` | User is not admin or moderator |
-| 403 | `EMAIL_NOT_VERIFIED` | Email not verified |
-
 ---
 
-### POST /users
+#### `GET /users/:id`
 
-Create a new user (admin-initiated, bypasses self-registration flow).
+Get a single user by ID. **Admin, Moderator, or Self.**
 
-**Auth:** Bearer token required  
-**Role:** `admin`
+**Auth**: 🔒 Bearer Token (owner, admin, moderator)  
+**Email Verified**: ✅ Required
 
-**Request Body**
+**Path Parameters**:
 
-| Field | Type | Required | Constraints |
-|---|---|---|---|
-| `email` | string | ✅ | Valid email |
-| `username` | string | ✅ | Alphanumeric, 3–30 chars |
-| `password` | string | ✅ | Min 8 chars, complexity required |
-| `role` | string | ❌ | `admin`, `moderator`, or `user` (default: `user`) |
-| `firstName` | string | ❌ | Max 100 chars |
-| `lastName` | string | ❌ | Max 100 chars |
-| `bestContactEmail` | string | ❌ | Valid email |
-| `institutionId` | integer | ❌ | Must reference an existing institution ID |
-| `department` | string | ❌ | Max 255 chars |
-| `areasOfExpertise` | string | ❌ | Max 1000 chars |
-| `countryId` | integer | ❌ | Must reference an existing country ID |
-| `researchNetworkId` | integer | ❌ | Must reference an existing research network ID |
-| `fieldOfStudy` | string | ❌ | Max 255 chars |
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | integer | User ID (positive integer) |
 
-**Response 201**
-```json
-{
-  "success": true,
-  "message": "User created successfully",
-  "data": {
-    "user": {
-      "id": 5,
-      "email": "newuser@example.com",
-      "username": "newuser",
-      "role": "user"
-    }
-  }
-}
+**Example Request**:
+```
+GET /users/10
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
-**Error Responses**
-
-| Status | Code | Trigger |
-|---|---|---|
-| 400 | `VALIDATION_ERROR` | Missing or invalid fields |
-| 401 | `TOKEN_REQUIRED` | No Authorization header |
-| 403 | `FORBIDDEN` | User is not admin |
-| 409 | `CONFLICT` | Email or username already exists |
-
----
-
-### GET /users/:id
-
-Retrieve a single user by ID.
-
-**Auth:** Bearer token required  
-**Access:** Admin, moderator, or the user themselves (`id` matches token's user ID)
-
-**Path Parameter**
-
-| Parameter | Type | Required |
-|---|---|---|
-| `id` | positive integer | ✅ |
-
-**Response 200**
+**Response** `200 OK`:
 ```json
 {
   "success": true,
   "message": "User retrieved successfully",
   "data": {
     "user": {
-      "id": 4,
-      "email": "jane.doe@example.com",
-      "username": "janedoe",
-      "firstName": "Jane",
+      "id": 10,
+      "email": "john.doe@example.com",
+      "username": "johndoe",
+      "firstName": "John",
       "lastName": "Doe",
-      "role": "user",
+      "bestContactEmail": null,
       "institutionId": 1,
-      "institutionName": "Chulalongkorn University",
-      "countryId": 1,
-      "countryName": "Thailand",
-      "researchNetworkId": null,
-      "researchNetworkName": null,
+      "department": "Computer Science",
+      "areasOfExpertise": "AI, Machine Learning",
+      "countryId": 5,
+      "researchNetworkId": 2,
+      "fieldOfStudy": "Artificial Intelligence",
+      "role": "user",
       "emailVerified": true,
       "isActive": true,
-      "createdAt": "2026-03-07T04:54:32.000Z"
+      "deletedAt": null,
+      "createdAt": "2026-04-04T12:00:00.000Z",
+      "updatedAt": "2026-04-04T12:00:00.000Z"
     }
   }
 }
 ```
 
-**Error Responses**
+**Error Responses**:
 
-| Status | Code | Trigger |
-|---|---|---|
-| 400 | `VALIDATION_ERROR` | `id` is not a positive integer |
-| 401 | `TOKEN_REQUIRED` | No Authorization header |
-| 403 | `FORBIDDEN` | Accessing another user's data without permission |
-| 404 | `NOT_FOUND` | User does not exist |
+| Status | Code | Description |
+|--------|------|-------------|
+| `403` | `FORBIDDEN` | Not owner or admin |
+| `404` | `NOT_FOUND` | User not found |
 
 ---
 
-### PUT /users/:id
+#### `POST /users`
 
-Update a user's profile fields. At least one field must be provided.
+Create a new user (admin action — bypasses email verification flow).
 
-**Auth:** Bearer token required  
-**Access:** Admin, moderator, or the user themselves
+**Auth**: 🔒 Bearer Token (admin only)  
+**Email Verified**: ✅ Required
 
-**Path Parameter**
+**Request Body** (`application/json`):
 
-| Parameter | Type | Required |
-|---|---|---|
-| `id` | positive integer | ✅ |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | ✅ | Valid email address |
+| `username` | string | ✅ | Alphanumeric, 3–30 chars |
+| `password` | string | ✅ | Min 8 chars with complexity requirements |
+| `firstName` | string | ❌ | Max 100 chars |
+| `lastName` | string | ❌ | Max 100 chars |
+| `bestContactEmail` | string | ❌ | Valid email |
+| `institutionId` | integer | ❌ | Valid institution ID |
+| `department` | string | ❌ | Max 255 chars |
+| `areasOfExpertise` | string | ❌ | Max 1000 chars |
+| `countryId` | integer | ❌ | Valid country ID |
+| `researchNetworkId` | integer | ❌ | Valid research network ID |
+| `fieldOfStudy` | string | ❌ | Max 255 chars |
+| `role` | string | ❌ | `"admin"`, `"moderator"`, or `"user"` |
 
-**Request Body** *(at least one field required)*
-
-| Field | Type | Constraints |
-|---|---|---|
-| `email` | string | Valid email |
-| `username` | string | Alphanumeric, 3–30 chars |
-| `firstName` | string | Max 100 chars |
-| `lastName` | string | Max 100 chars |
-| `bestContactEmail` | string | Valid email |
-| `institutionId` | integer | Must reference an existing institution ID |
-| `department` | string | Max 255 chars |
-| `areasOfExpertise` | string | Max 1000 chars |
-| `countryId` | integer | Must reference an existing country ID |
-| `researchNetworkId` | integer | Must reference an existing research network ID |
-| `fieldOfStudy` | string | Max 255 chars |
-| `role` | string | `admin`, `moderator`, or `user` |
-| `isActive` | boolean | Activate / deactivate account |
-
-**Example Request**
+**Example Request**:
 ```json
 {
-  "firstName": "Jane",
-  "institutionId": 1,
+  "email": "newuser@example.com",
+  "username": "newuser",
+  "password": "SecurePass1!",
+  "firstName": "New",
+  "lastName": "User",
+  "role": "moderator",
+  "institutionId": 3,
   "countryId": 1
 }
 ```
 
-**Response 200**
+**Response** `201 Created`:
+```json
+{
+  "success": true,
+  "message": "User created successfully",
+  "data": {
+    "user": {
+      "id": 11,
+      "email": "newuser@example.com",
+      "username": "newuser",
+      "firstName": "New",
+      "lastName": "User",
+      "bestContactEmail": null,
+      "institutionId": 3,
+      "department": null,
+      "areasOfExpertise": null,
+      "countryId": 1,
+      "researchNetworkId": null,
+      "fieldOfStudy": null,
+      "role": "moderator",
+      "emailVerified": false,
+      "isActive": true,
+      "createdAt": "2026-04-04T12:00:00.000Z",
+      "updatedAt": "2026-04-04T12:00:00.000Z"
+    }
+  }
+}
+```
+
+---
+
+#### `PUT /users/:id`
+
+Update user profile. **Admin, Moderator, or Self.**
+
+**Auth**: 🔒 Bearer Token (owner, admin, moderator)  
+**Email Verified**: ✅ Required
+
+**Path Parameters**:
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | integer | User ID |
+
+**Request Body** (`application/json`) — at least one field required:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | ❌ | Valid email |
+| `username` | string | ❌ | Alphanumeric, 3–30 chars |
+| `firstName` | string | ❌ | Max 100 chars (can be empty string) |
+| `lastName` | string | ❌ | Max 100 chars (can be empty string) |
+| `bestContactEmail` | string | ❌ | Valid email (can be empty string) |
+| `institutionId` | integer | ❌ | Valid institution ID |
+| `department` | string | ❌ | Max 255 chars (can be empty string) |
+| `areasOfExpertise` | string | ❌ | Max 1000 chars (can be empty string) |
+| `countryId` | integer | ❌ | Valid country ID |
+| `researchNetworkId` | integer | ❌ | Valid research network ID |
+| `fieldOfStudy` | string | ❌ | Max 255 chars (can be empty string) |
+| `role` | string | ❌ | `"admin"`, `"moderator"`, or `"user"` (admin only) |
+| `isActive` | boolean | ❌ | Activate/deactivate account (admin only) |
+
+**Example Request**:
+```json
+{
+  "firstName": "Jonathan",
+  "department": "Data Science",
+  "areasOfExpertise": "NLP, Computer Vision"
+}
+```
+
+**Response** `200 OK`:
 ```json
 {
   "success": true,
   "message": "User updated successfully",
   "data": {
-    "user": { }
+    "user": {
+      "id": 10,
+      "email": "john.doe@example.com",
+      "username": "johndoe",
+      "firstName": "Jonathan",
+      "lastName": "Doe",
+      "bestContactEmail": null,
+      "institutionId": 1,
+      "department": "Data Science",
+      "areasOfExpertise": "NLP, Computer Vision",
+      "countryId": 5,
+      "researchNetworkId": 2,
+      "fieldOfStudy": "Artificial Intelligence",
+      "role": "user",
+      "emailVerified": true,
+      "isActive": true,
+      "createdAt": "2026-04-04T12:00:00.000Z",
+      "updatedAt": "2026-04-04T12:30:00.000Z"
+    }
   }
 }
 ```
 
-**Error Responses**
-
-| Status | Code | Trigger |
-|---|---|---|
-| 400 | `VALIDATION_ERROR` | No fields provided or invalid values |
-| 401 | `TOKEN_REQUIRED` | No Authorization header |
-| 403 | `FORBIDDEN` | Not owner, admin, or moderator |
-| 404 | `NOT_FOUND` | User does not exist |
-
 ---
 
-### DELETE /users/:id
+#### `DELETE /users/:id`
 
-Delete a user. Supports soft delete (default, restorable) or hard (permanent) delete.
+Delete a user (soft or hard delete). **Admin only.**
 
-**Auth:** Bearer token required  
-**Role:** `admin`
+**Auth**: 🔒 Bearer Token (admin only)  
+**Email Verified**: ✅ Required
 
-**Path Parameter**
+**Path Parameters**:
 
-| Parameter | Type | Required |
-|---|---|---|
-| `id` | positive integer | ✅ |
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | integer | User ID |
 
-**Query Parameters**
+**Query Parameters**:
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `hard` | boolean | `false` | `true` = permanent delete; `false` = soft delete |
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `hard` | boolean | `false` | `true` = permanent delete, `false` = soft delete |
 
-**Examples**
+**Example Request** (soft delete):
 ```
-DELETE /api/v1/users/5           (soft delete)
-DELETE /api/v1/users/5?hard=true (permanent delete)
+DELETE /users/10
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
-**Response 200**
+**Example Request** (hard delete):
+```
+DELETE /users/10?hard=true
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Response** `200 OK`:
 ```json
 {
   "success": true,
-  "message": "User deleted successfully",
+  "message": "User soft deleted successfully",
   "data": null
 }
 ```
 
-> ⚠️ Hard delete is permanent and cannot be undone.
-
-**Error Responses**
-
-| Status | Code | Trigger |
-|---|---|---|
-| 401 | `TOKEN_REQUIRED` | No Authorization header |
-| 403 | `FORBIDDEN` | User is not admin |
-| 404 | `NOT_FOUND` | User does not exist |
-
 ---
 
-### POST /users/:id/restore
+#### `POST /users/:id/restore`
 
-Restore a soft-deleted user.
+Restore a soft-deleted user. **Admin only.**
 
-**Auth:** Bearer token required  
-**Role:** `admin`
+**Auth**: 🔒 Bearer Token (admin only)  
+**Email Verified**: ✅ Required
 
-**Path Parameter**
+**Path Parameters**:
 
-| Parameter | Type | Required |
-|---|---|---|
-| `id` | positive integer | ✅ |
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | integer | User ID |
 
-**Response 200**
+**Example Request**:
+```
+POST /users/10/restore
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Response** `200 OK`:
 ```json
 {
   "success": true,
   "message": "User restored successfully",
   "data": {
-    "user": { }
+    "user": {
+      "id": 10,
+      "email": "john.doe@example.com",
+      "username": "johndoe",
+      "firstName": "John",
+      "lastName": "Doe",
+      "role": "user",
+      "emailVerified": true,
+      "isActive": true,
+      "deletedAt": null,
+      "createdAt": "2026-04-04T12:00:00.000Z",
+      "updatedAt": "2026-04-04T13:00:00.000Z"
+    }
   }
 }
 ```
 
-**Error Responses**
-
-| Status | Code | Trigger |
-|---|---|---|
-| 401 | `TOKEN_REQUIRED` | No Authorization header |
-| 403 | `FORBIDDEN` | User is not admin |
-| 404 | `NOT_FOUND` | User not found or not soft-deleted |
-
 ---
 
-## Country Endpoints
+### Countries
 
-All country endpoints require authentication. Write operations (POST/PUT/DELETE) require `admin` role.
+#### `GET /countries`
 
----
+List all countries. **Public** — no authentication required.
 
-### GET /countries
+**Auth**: None
 
-Retrieve all countries.
+**Example Request**:
+```
+GET /countries
+```
 
-**Auth:** Bearer token required  
-**Role:** Any authenticated user
-
-**Response 200**
+**Response** `200 OK`:
 ```json
 {
   "success": true,
   "message": "Countries retrieved successfully",
   "data": {
     "countries": [
-      { "id": 1, "name": "Thailand", "createdAt": "2026-03-07T00:00:00.000Z", "updatedAt": "2026-03-07T00:00:00.000Z" }
+      {
+        "id": 1,
+        "name": "Thailand",
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "updatedAt": "2026-01-01T00:00:00.000Z"
+      },
+      {
+        "id": 2,
+        "name": "Japan",
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "updatedAt": "2026-01-01T00:00:00.000Z"
+      },
+      {
+        "id": 3,
+        "name": "Germany",
+        "createdAt": "2026-01-15T00:00:00.000Z",
+        "updatedAt": "2026-01-15T00:00:00.000Z"
+      }
     ]
   }
 }
@@ -1016,136 +1094,153 @@ Retrieve all countries.
 
 ---
 
-### GET /countries/:id
+#### `GET /countries/:id`
 
-Retrieve a single country by ID.
+Get a single country by ID.
 
-**Auth:** Bearer token required  
-**Role:** Any authenticated user
+**Auth**: 🔒 Bearer Token (any authenticated user)
 
-**Path Parameter**
+**Path Parameters**:
 
-| Parameter | Type | Required |
-|---|---|---|
-| `id` | positive integer | ✅ |
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | integer | Country ID |
 
-**Response 200**
+**Example Request**:
+```
+GET /countries/1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Response** `200 OK`:
 ```json
 {
   "success": true,
   "message": "Country retrieved successfully",
   "data": {
-    "country": { "id": 1, "name": "Thailand", "created_at": "...", "updated_at": "..." }
+    "country": {
+      "id": 1,
+      "name": "Thailand",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-01T00:00:00.000Z"
+    }
   }
 }
 ```
 
-**Error Responses**
+**Error Responses**:
 
-| Status | Code | Trigger |
-|---|---|---|
-| 400 | `VALIDATION_ERROR` | `id` is not a positive integer |
-| 401 | `TOKEN_REQUIRED` | No Authorization header |
-| 404 | `NOT_FOUND` | Country does not exist |
+| Status | Code | Description |
+|--------|------|-------------|
+| `404` | `NOT_FOUND` | Country not found |
 
 ---
 
-### POST /countries
+#### `POST /countries`
 
-Create a new country.
+Create a new country. **Admin only.**
 
-**Auth:** Bearer token required  
-**Role:** `admin`
+**Auth**: 🔒 Bearer Token (admin only)
 
-**Request Body**
+**Request Body** (`application/json`):
 
-| Field | Type | Required | Constraints |
-|---|---|---|---|
-| `name` | string | ✅ | 1–100 characters |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | ✅ | Country name, 1–100 chars |
 
-**Example Request**
+**Example Request**:
 ```json
-{ "name": "Thailand" }
+{
+  "name": "South Korea"
+}
 ```
 
-**Response 201**
+**Response** `201 Created`:
 ```json
 {
   "success": true,
   "message": "Country created successfully",
   "data": {
-    "country": { "id": 1, "name": "Thailand", "createdAt": "...", "updatedAt": "..." }
+    "country": {
+      "id": 4,
+      "name": "South Korea",
+      "createdAt": "2026-04-04T12:00:00.000Z",
+      "updatedAt": "2026-04-04T12:00:00.000Z"
+    }
   }
 }
 ```
 
-**Error Responses**
+**Error Responses**:
 
-| Status | Code | Trigger |
-|---|---|---|
-| 400 | `VALIDATION_ERROR` | Missing or invalid fields |
-| 401 | `TOKEN_REQUIRED` | No Authorization header |
-| 403 | `FORBIDDEN` | User is not admin |
-| 409 | `CONFLICT` | Country name already exists |
+| Status | Code | Description |
+|--------|------|-------------|
+| `409` | `DUPLICATE_ENTRY` | Country name already exists |
 
 ---
 
-### PUT /countries/:id
+#### `PUT /countries/:id`
 
-Update a country name.
+Update a country. **Admin only.**
 
-**Auth:** Bearer token required  
-**Role:** `admin`
+**Auth**: 🔒 Bearer Token (admin only)
 
-**Path Parameter**
+**Path Parameters**:
 
-| Parameter | Type | Required |
-|---|---|---|
-| `id` | positive integer | ✅ |
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | integer | Country ID |
 
-**Request Body**
+**Request Body** (`application/json`):
 
-| Field | Type | Required | Constraints |
-|---|---|---|---|
-| `name` | string | ✅ | 1–100 characters |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | ✅ | Updated country name, 1–100 chars |
 
-**Response 200**
+**Example Request**:
+```json
+{
+  "name": "Republic of Korea"
+}
+```
+
+**Response** `200 OK`:
 ```json
 {
   "success": true,
   "message": "Country updated successfully",
   "data": {
-    "country": { "id": 1, "name": "Updated Name", "createdAt": "...", "updatedAt": "..." }
+    "country": {
+      "id": 4,
+      "name": "Republic of Korea",
+      "createdAt": "2026-04-04T12:00:00.000Z",
+      "updatedAt": "2026-04-04T12:30:00.000Z"
+    }
   }
 }
 ```
 
-**Error Responses**
-
-| Status | Code | Trigger |
-|---|---|---|
-| 400 | `VALIDATION_ERROR` | Missing or invalid fields |
-| 401 | `TOKEN_REQUIRED` | No Authorization header |
-| 403 | `FORBIDDEN` | User is not admin |
-| 404 | `NOT_FOUND` | Country does not exist |
-| 409 | `CONFLICT` | Country name already exists |
-
 ---
 
-### DELETE /countries/:id
+#### `DELETE /countries/:id`
 
-Delete a country. Fails if any institutions are still linked to it.
+Delete a country. **Admin only.**
 
-**Auth:** Bearer token required  
-**Role:** `admin`
+**Auth**: 🔒 Bearer Token (admin only)
 
-**Path Parameter**
+**Path Parameters**:
 
-| Parameter | Type | Required |
-|---|---|---|
-| `id` | positive integer | ✅ |
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | integer | Country ID |
 
-**Response 200**
+**Example Request**:
+```
+DELETE /countries/4
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Response** `200 OK`:
 ```json
 {
   "success": true,
@@ -1154,43 +1249,35 @@ Delete a country. Fails if any institutions are still linked to it.
 }
 ```
 
-**Error Responses**
+**Error Responses**:
 
-| Status | Code | Trigger |
-|---|---|---|
-| 401 | `TOKEN_REQUIRED` | No Authorization header |
-| 403 | `FORBIDDEN` | User is not admin |
-| 404 | `NOT_FOUND` | Country does not exist |
-| 500 | `INTERNAL_ERROR` | Institutions are still linked to this country (FK RESTRICT) |
+| Status | Code | Description |
+|--------|------|-------------|
+| `400` | `INTERNAL_ERROR` | Cannot delete — country has associated institutions (FK RESTRICT) |
 
 ---
 
-## Institution Endpoints
+### Institutions
 
-All institution endpoints require authentication. Write operations (POST/PUT/DELETE) require `admin` role.
+#### `GET /institutions`
 
----
+List all institutions with pagination. **Public** — no authentication required.
 
-### GET /institutions
+**Auth**: None
 
-Retrieve a paginated list of institutions. Each record includes the linked `countryName`.
+**Query Parameters**:
 
-**Auth:** Bearer token required  
-**Role:** Any authenticated user
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `page` | integer | `1` | Page number (≥ 1) |
+| `limit` | integer | `20` | Items per page (1–100) |
 
-**Query Parameters**
-
-| Parameter | Type | Default | Constraints |
-|---|---|---|---|
-| `page` | integer | `1` | Min 1 |
-| `limit` | integer | `20` | Min 1, Max 100 |
-
-**Example**
+**Example Request**:
 ```
-GET /api/v1/institutions?page=1&limit=20
+GET /institutions?page=1&limit=10
 ```
 
-**Response 200**
+**Response** `200 OK`:
 ```json
 {
   "success": true,
@@ -1202,33 +1289,51 @@ GET /api/v1/institutions?page=1&limit=20
         "name": "Chulalongkorn University",
         "countryId": 1,
         "countryName": "Thailand",
-        "createdAt": "...",
-        "updatedAt": "..."
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "updatedAt": "2026-01-01T00:00:00.000Z"
+      },
+      {
+        "id": 2,
+        "name": "University of Tokyo",
+        "countryId": 2,
+        "countryName": "Japan",
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "updatedAt": "2026-01-01T00:00:00.000Z"
       }
     ],
-    "total": 1,
-    "page": 1,
-    "limit": 20
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "total": 15,
+      "pages": 2,
+      "hasNext": true,
+      "hasPrev": false
+    }
   }
 }
 ```
 
 ---
 
-### GET /institutions/:id
+#### `GET /institutions/:id`
 
-Retrieve a single institution by ID.
+Get a single institution by ID.
 
-**Auth:** Bearer token required  
-**Role:** Any authenticated user
+**Auth**: 🔒 Bearer Token (any authenticated user)
 
-**Path Parameter**
+**Path Parameters**:
 
-| Parameter | Type | Required |
-|---|---|---|
-| `id` | positive integer | ✅ |
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | integer | Institution ID |
 
-**Response 200**
+**Example Request**:
+```
+GET /institutions/1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Response** `200 OK`:
 ```json
 {
   "success": true,
@@ -1239,132 +1344,121 @@ Retrieve a single institution by ID.
       "name": "Chulalongkorn University",
       "countryId": 1,
       "countryName": "Thailand",
-      "createdAt": "...",
-      "updatedAt": "..."
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-01T00:00:00.000Z"
     }
   }
 }
 ```
 
-**Error Responses**
-
-| Status | Code | Trigger |
-|---|---|---|
-| 400 | `VALIDATION_ERROR` | `id` is not a positive integer |
-| 401 | `TOKEN_REQUIRED` | No Authorization header |
-| 404 | `NOT_FOUND` | Institution does not exist |
-
 ---
 
-### POST /institutions
+#### `POST /institutions`
 
-Create a new institution.
+Create a new institution. **Admin only.**
 
-**Auth:** Bearer token required  
-**Role:** `admin`
+**Auth**: 🔒 Bearer Token (admin only)
 
-**Request Body**
+**Request Body** (`application/json`):
 
-| Field | Type | Required | Constraints |
-|---|---|---|---|
-| `name` | string | ✅ | 1–255 characters |
-| `countryId` | integer | ✅ | Must reference an existing country ID |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | ✅ | Institution name, 1–255 chars |
+| `countryId` | integer | ✅ | Associated country ID |
 
-**Example Request**
+**Example Request**:
 ```json
 {
-  "name": "Chulalongkorn University",
-  "countryId": 1
+  "name": "Seoul National University",
+  "countryId": 4
 }
 ```
 
-**Response 201**
+**Response** `201 Created`:
 ```json
 {
   "success": true,
   "message": "Institution created successfully",
   "data": {
     "institution": {
-      "id": 1,
-      "name": "Chulalongkorn University",
-      "countryId": 1,
-      "countryName": "Thailand",
-      "createdAt": "...",
-      "updatedAt": "..."
+      "id": 3,
+      "name": "Seoul National University",
+      "countryId": 4,
+      "countryName": "Republic of Korea",
+      "createdAt": "2026-04-04T12:00:00.000Z",
+      "updatedAt": "2026-04-04T12:00:00.000Z"
     }
   }
 }
 ```
 
-**Error Responses**
-
-| Status | Code | Trigger |
-|---|---|---|
-| 400 | `VALIDATION_ERROR` | Missing or invalid fields |
-| 401 | `TOKEN_REQUIRED` | No Authorization header |
-| 403 | `FORBIDDEN` | User is not admin |
-| 404 | `NOT_FOUND` | `countryId` does not reference a valid country |
-| 409 | `CONFLICT` | Institution with same name already exists in that country |
-
 ---
 
-### PUT /institutions/:id
+#### `PUT /institutions/:id`
 
-Update an institution. At least one field must be provided.
+Update an institution. **Admin only.**
 
-**Auth:** Bearer token required  
-**Role:** `admin`
+**Auth**: 🔒 Bearer Token (admin only)
 
-**Path Parameter**
+**Path Parameters**:
 
-| Parameter | Type | Required |
-|---|---|---|
-| `id` | positive integer | ✅ |
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | integer | Institution ID |
 
-**Request Body** *(at least one field required)*
+**Request Body** (`application/json`) — at least one field required:
 
-| Field | Type | Constraints |
-|---|---|---|
-| `name` | string | 1–255 characters |
-| `countryId` | integer | Must reference an existing country ID |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | ❌ | Updated name, 1–255 chars |
+| `countryId` | integer | ❌ | Updated country ID |
 
-**Response 200**
+**Example Request**:
+```json
+{
+  "name": "SNU - Seoul National University"
+}
+```
+
+**Response** `200 OK`:
 ```json
 {
   "success": true,
   "message": "Institution updated successfully",
   "data": {
-    "institution": { }
+    "institution": {
+      "id": 3,
+      "name": "SNU - Seoul National University",
+      "countryId": 4,
+      "countryName": "Republic of Korea",
+      "createdAt": "2026-04-04T12:00:00.000Z",
+      "updatedAt": "2026-04-04T12:30:00.000Z"
+    }
   }
 }
 ```
 
-**Error Responses**
-
-| Status | Code | Trigger |
-|---|---|---|
-| 400 | `VALIDATION_ERROR` | No fields provided or invalid values |
-| 401 | `TOKEN_REQUIRED` | No Authorization header |
-| 403 | `FORBIDDEN` | User is not admin |
-| 404 | `NOT_FOUND` | Institution or country does not exist |
-| 409 | `CONFLICT` | Institution with same name already exists in that country |
-
 ---
 
-### DELETE /institutions/:id
+#### `DELETE /institutions/:id`
 
-Delete an institution permanently.
+Delete an institution. **Admin only.**
 
-**Auth:** Bearer token required  
-**Role:** `admin`
+**Auth**: 🔒 Bearer Token (admin only)
 
-**Path Parameter**
+**Path Parameters**:
 
-| Parameter | Type | Required |
-|---|---|---|
-| `id` | positive integer | ✅ |
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | integer | Institution ID |
 
-**Response 200**
+**Example Request**:
+```
+DELETE /institutions/3
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Response** `200 OK`:
 ```json
 {
   "success": true,
@@ -1373,37 +1467,40 @@ Delete an institution permanently.
 }
 ```
 
-**Error Responses**
-
-| Status | Code | Trigger |
-|---|---|---|
-| 401 | `TOKEN_REQUIRED` | No Authorization header |
-| 403 | `FORBIDDEN` | User is not admin |
-| 404 | `NOT_FOUND` | Institution does not exist |
-
 ---
 
-## Research Network Endpoints
+### Research Networks
 
-All research network endpoints require authentication. Write operations (POST/PUT/DELETE) require `admin` role.
+#### `GET /research-networks`
 
----
+List all research networks. **Public** — no authentication required.
 
-### GET /research-networks
+**Auth**: None
 
-Retrieve all research networks.
+**Example Request**:
+```
+GET /research-networks
+```
 
-**Auth:** Bearer token required  
-**Role:** Any authenticated user
-
-**Response 200**
+**Response** `200 OK`:
 ```json
 {
   "success": true,
   "message": "Research networks retrieved successfully",
   "data": {
     "researchNetworks": [
-      { "id": 1, "name": "ASEAN Research Network", "createdAt": "...", "updatedAt": "..." }
+      {
+        "id": 1,
+        "name": "ASEAN Research Network",
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "updatedAt": "2026-01-01T00:00:00.000Z"
+      },
+      {
+        "id": 2,
+        "name": "EU-Asia Science Bridge",
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "updatedAt": "2026-01-01T00:00:00.000Z"
+      }
     ]
   }
 }
@@ -1411,136 +1508,141 @@ Retrieve all research networks.
 
 ---
 
-### GET /research-networks/:id
+#### `GET /research-networks/:id`
 
-Retrieve a single research network by ID.
+Get a single research network by ID.
 
-**Auth:** Bearer token required  
-**Role:** Any authenticated user
+**Auth**: 🔒 Bearer Token (any authenticated user)
 
-**Path Parameter**
+**Path Parameters**:
 
-| Parameter | Type | Required |
-|---|---|---|
-| `id` | positive integer | ✅ |
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | integer | Research network ID |
 
-**Response 200**
+**Example Request**:
+```
+GET /research-networks/1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Response** `200 OK`:
 ```json
 {
   "success": true,
   "message": "Research network retrieved successfully",
   "data": {
-    "researchNetwork": { "id": 1, "name": "ASEAN Research Network", "createdAt": "...", "updatedAt": "..." }
+    "researchNetwork": {
+      "id": 1,
+      "name": "ASEAN Research Network",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-01T00:00:00.000Z"
+    }
   }
 }
 ```
 
-**Error Responses**
-
-| Status | Code | Trigger |
-|---|---|---|
-| 400 | `VALIDATION_ERROR` | `id` is not a positive integer |
-| 401 | `TOKEN_REQUIRED` | No Authorization header |
-| 404 | `NOT_FOUND` | Research network does not exist |
-
 ---
 
-### POST /research-networks
+#### `POST /research-networks`
 
-Create a new research network.
+Create a new research network. **Admin only.**
 
-**Auth:** Bearer token required  
-**Role:** `admin`
+**Auth**: 🔒 Bearer Token (admin only)
 
-**Request Body**
+**Request Body** (`application/json`):
 
-| Field | Type | Required | Constraints |
-|---|---|---|---|
-| `name` | string | ✅ | 1–255 characters |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | ✅ | Network name, 1–255 chars |
 
-**Example Request**
+**Example Request**:
 ```json
-{ "name": "ASEAN Research Network" }
+{
+  "name": "Pacific Rim Innovation Network"
+}
 ```
 
-**Response 201**
+**Response** `201 Created`:
 ```json
 {
   "success": true,
   "message": "Research network created successfully",
   "data": {
-    "researchNetwork": { "id": 1, "name": "ASEAN Research Network", "createdAt": "...", "updatedAt": "..." }
+    "researchNetwork": {
+      "id": 3,
+      "name": "Pacific Rim Innovation Network",
+      "createdAt": "2026-04-04T12:00:00.000Z",
+      "updatedAt": "2026-04-04T12:00:00.000Z"
+    }
   }
 }
 ```
 
-**Error Responses**
-
-| Status | Code | Trigger |
-|---|---|---|
-| 400 | `VALIDATION_ERROR` | Missing or invalid fields |
-| 401 | `TOKEN_REQUIRED` | No Authorization header |
-| 403 | `FORBIDDEN` | User is not admin |
-| 409 | `CONFLICT` | Research network name already exists |
-
 ---
 
-### PUT /research-networks/:id
+#### `PUT /research-networks/:id`
 
-Update a research network name.
+Update a research network. **Admin only.**
 
-**Auth:** Bearer token required  
-**Role:** `admin`
+**Auth**: 🔒 Bearer Token (admin only)
 
-**Path Parameter**
+**Path Parameters**:
 
-| Parameter | Type | Required |
-|---|---|---|
-| `id` | positive integer | ✅ |
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | integer | Research network ID |
 
-**Request Body**
+**Request Body** (`application/json`):
 
-| Field | Type | Required | Constraints |
-|---|---|---|---|
-| `name` | string | ✅ | 1–255 characters |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | ✅ | Updated name, 1–255 chars |
 
-**Response 200**
+**Example Request**:
+```json
+{
+  "name": "Pacific Rim Innovation & Research Network"
+}
+```
+
+**Response** `200 OK`:
 ```json
 {
   "success": true,
   "message": "Research network updated successfully",
   "data": {
-    "researchNetwork": { "id": 1, "name": "Updated Name", "createdAt": "...", "updatedAt": "..." }
+    "researchNetwork": {
+      "id": 3,
+      "name": "Pacific Rim Innovation & Research Network",
+      "createdAt": "2026-04-04T12:00:00.000Z",
+      "updatedAt": "2026-04-04T12:30:00.000Z"
+    }
   }
 }
 ```
 
-**Error Responses**
-
-| Status | Code | Trigger |
-|---|---|---|
-| 400 | `VALIDATION_ERROR` | Missing or invalid fields |
-| 401 | `TOKEN_REQUIRED` | No Authorization header |
-| 403 | `FORBIDDEN` | User is not admin |
-| 404 | `NOT_FOUND` | Research network does not exist |
-| 409 | `CONFLICT` | Research network name already exists |
-
 ---
 
-### DELETE /research-networks/:id
+#### `DELETE /research-networks/:id`
 
-Delete a research network permanently.
+Delete a research network. **Admin only.**
 
-**Auth:** Bearer token required  
-**Role:** `admin`
+**Auth**: 🔒 Bearer Token (admin only)
 
-**Path Parameter**
+**Path Parameters**:
 
-| Parameter | Type | Required |
-|---|---|---|
-| `id` | positive integer | ✅ |
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | integer | Research network ID |
 
-**Response 200**
+**Example Request**:
+```
+DELETE /research-networks/3
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Response** `200 OK`:
 ```json
 {
   "success": true,
@@ -1549,402 +1651,73 @@ Delete a research network permanently.
 }
 ```
 
-**Error Responses**
-
-| Status | Code | Trigger |
-|---|---|---|
-| 401 | `TOKEN_REQUIRED` | No Authorization header |
-| 403 | `FORBIDDEN` | User is not admin |
-| 404 | `NOT_FOUND` | Research network does not exist |
-
 ---
 
-## Password Requirements
+### Announcements
 
-All password fields must satisfy:
+#### `GET /announcements`
 
-- Minimum **8 characters**
-- At least one **uppercase** letter (A–Z)
-- At least one **lowercase** letter (a–z)
-- At least one **digit** (0–9)
-- At least one **special character** from: `@ $ ! % * ? &`
+List announcements with pagination and optional filters. **Public** — no authentication required.
 
-**Valid example:** `Secure@1234`
+**Auth**: None
 
----
+**Query Parameters**:
 
-## Roles & Permissions
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `page` | integer | `1` | Page number (≥ 1) |
+| `limit` | integer | `20` | Items per page (1–100) |
+| `status` | string | — | Filter by status: `"draft"`, `"published"`, or `"archived"` |
+| `researchNetworkId` | integer | — | Filter by research network ID |
 
-| Action | `user` | `moderator` | `admin` |
-|---|---|---|---|
-| Login / Register | ✅ | ✅ | ✅ |
-| View own profile | ✅ | ✅ | ✅ |
-| Update own profile | ✅ | ✅ | ✅ |
-| View all users (`GET /users`) | ❌ | ✅ | ✅ |
-| View any user (`GET /users/:id`) | ❌ | ✅ | ✅ |
-| Update any user | ❌ | ✅ | ✅ |
-| Create user (`POST /users`) | ❌ | ❌ | ✅ |
-| Delete user | ❌ | ❌ | ✅ |
-| Restore user | ❌ | ❌ | ✅ |
-| View countries / institutions / research networks | ✅ | ✅ | ✅ |
-| Create / update / delete countries | ❌ | ❌ | ✅ |
-| Create / update / delete institutions | ❌ | ❌ | ✅ |
-| Create / update / delete research networks | ❌ | ❌ | ✅ |
-
----
-
-## Token Lifetimes
-
-| Token | Lifetime |
-|---|---|
-| Access Token | 15 minutes |
-| Refresh Token | 7 days |
-| Email Verification Token | 24 hours |
-| Password Reset Token | 1 hour |
-
----
-
-## Known Issues
-
-The following endpoints currently return **500 Internal Server Error** and are tracked for fixes:
-
-| Endpoint | Expected Behaviour | Root Cause |
-|---|---|---|
-| `POST /auth/register` with duplicate email/username | 409 Conflict | Unhandled DB duplicate key error |
-| `POST /auth/login` with wrong password | 401 Unauthorized | bcrypt compare error not caught in service |
-| `GET /auth/verify-email?token=<invalid>` | 400 Bad Request | Token lookup exception not caught |
-| `POST /auth/resend-verification` | 200 OK | SMTP/email service not configured on server |
-| `POST /auth/forgot-password` | 200 OK | SMTP/email service not configured on server |
-
-Creates a new user account and sends email verification.
-
-**Request Body:**
-```json
-{
-  "email": "user@example.com",
-  "username": "johndoe",
-  "password": "Password123!",
-  "firstName": "John",
-  "lastName": "Doe",
-  "bestContactEmail": "john.doe@work.com",
-  "institutionId": 1,
-  "department": "Computer Science",
-  "areasOfExpertise": "AI, Machine Learning",
-  "countryId": 1,
-  "researchNetworkId": 1
-}
+**Example Request**:
+```
+GET /announcements?page=1&limit=5&status=published
 ```
 
-**Required Fields:**
-- `email` - Valid email address
-- `username` - 3-30 alphanumeric characters
-- `password` - Min 8 chars, must include uppercase, lowercase, number, and special character
-
-**Response:** `201 Created`
+**Response** `200 OK`:
 ```json
 {
   "success": true,
-  "message": "Registration successful. Please check your email to verify your account.",
+  "message": "Announcements retrieved successfully",
   "data": {
-    "user": {
-      "id": 1,
-      "email": "user@example.com",
-      "username": "johndoe",
-      "role": "user",
-      "emailVerified": false,
-      ...
-    }
-  }
-}
-```
-
----
-
-### 2. Login
-**POST** `/auth/login`
-
-Authenticate user and get access/refresh tokens.
-
-**Request Body:**
-```json
-{
-  "email": "user@example.com",
-  "password": "Password123!"
-}
-```
-
-**Response:** `200 OK`
-```json
-{
-  "success": true,
-  "message": "Login successful",
-  "data": {
-    "user": { ... },
-    "accessToken": "eyJhbGciOiJIUzI1NiIs...",
-    "refreshToken": "eyJhbGciOiJIUzI1NiIs...",
-    "emailVerified": false
-  }
-}
-```
-
-**Note:** Users can login with unverified email, but some actions require verification.
-
----
-
-### 3. Refresh Access Token
-**POST** `/auth/refresh-token`
-
-Get a new access token using refresh token (token rotation).
-
-**Request Body:**
-```json
-{
-  "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
-}
-```
-
-**Response:** `200 OK`
-```json
-{
-  "success": true,
-  "message": "Token refreshed successfully",
-  "data": {
-    "accessToken": "new_access_token",
-    "refreshToken": "new_refresh_token"
-  }
-}
-```
-
-**Note:** Old refresh token is revoked (rotation strategy).
-
----
-
-### 4. Logout
-**POST** `/auth/logout` 🔒
-
-Revoke refresh token.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Request Body:**
-```json
-{
-  "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
-}
-```
-
-**Response:** `200 OK`
-
----
-
-### 5. Verify Email
-**GET** `/auth/verify-email?token=<verification_token>`
-
-Verify user's email address.
-
-**Query Parameters:**
-- `token` - Email verification token from email
-
-**Response:** `200 OK`
-```json
-{
-  "success": true,
-  "message": "Email verified successfully",
-  "data": {
-    "user": { ... }
-  }
-}
-```
-
----
-
-### 6. Resend Verification Email
-**POST** `/auth/resend-verification`
-
-Resend email verification link.
-
-**Request Body:**
-```json
-{
-  "email": "user@example.com"
-}
-```
-
-**Response:** `200 OK`
-```json
-{
-  "success": true,
-  "message": "Verification email sent"
-}
-```
-
-**Rate Limit:** 5 requests per hour per IP
-
----
-
-### 7. Forgot Password
-**POST** `/auth/forgot-password`
-
-Request password reset email.
-
-**Request Body:**
-```json
-{
-  "email": "user@example.com"
-}
-```
-
-**Response:** `200 OK`
-```json
-{
-  "success": true,
-  "message": "If the email exists, a password reset link has been sent."
-}
-```
-
-**Note:** Always returns success to prevent email enumeration.
-
-**Rate Limit:** 3 requests per hour per IP
-
----
-
-### 8. Verify Reset Token
-**GET** `/auth/verify-reset-token?token=<reset_token>`
-
-Check if password reset token is valid.
-
-**Query Parameters:**
-- `token` - Password reset token
-
-**Response:** `200 OK`
-```json
-{
-  "success": true,
-  "message": "Token is valid",
-  "data": {
-    "valid": true
-  }
-}
-```
-
----
-
-### 9. Reset Password
-**POST** `/auth/reset-password`
-
-Reset password using token from email.
-
-**Request Body:**
-```json
-{
-  "token": "reset_token_from_email",
-  "newPassword": "NewPassword123!"
-}
-```
-
-**Response:** `200 OK`
-```json
-{
-  "success": true,
-  "message": "Password reset successfully"
-}
-```
-
-**Note:** All user sessions are terminated after password reset.
-
----
-
-### 10. Change Password
-**POST** `/auth/change-password` 🔒
-
-Change password for authenticated user.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Request Body:**
-```json
-{
-  "currentPassword": "OldPassword123!",
-  "newPassword": "NewPassword123!",
-  "refreshToken": "current_refresh_token" 
-}
-```
-
-**Response:** `200 OK`
-
-**Note:** All other sessions are terminated except current one.
-
----
-
-### 11. Get Current User
-**GET** `/auth/me` 🔒
-
-Get authenticated user's information.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Response:** `200 OK`
-```json
-{
-  "success": true,
-  "message": "User data retrieved",
-  "data": {
-    "user": {
-      "id": 1,
-      "email": "user@example.com",
-      "username": "johndoe",
-      "role": "user",
-      "emailVerified": true
-    }
-  }
-}
-```
-
----
-
-## 👥 User Management Endpoints
-
-### 1. Get All Users
-**GET** `/users` 🔒 👑 Admin/Moderator
-
-List all users with pagination.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Query Parameters:**
-- `page` (optional) - Page number (default: 1)
-- `limit` (optional) - Items per page (default: 20, max: 100)
-- `includeDeleted` (optional) - Include soft-deleted users (default: false)
-
-**Example:**
-```
-GET /api/v1/users?page=1&limit=20
-```
-
-**Response:** `200 OK`
-```json
-{
-  "success": true,
-  "message": "Users retrieved successfully",
-  "data": {
-    "items": [ ... ],
+    "items": [
+      {
+        "id": 1,
+        "title": "ASEM Annual Conference 2026",
+        "content": "We are pleased to announce the upcoming ASEM Annual Conference...",
+        "authorId": 1,
+        "researchNetworkId": 1,
+        "status": "published",
+        "isPinned": true,
+        "thumbnailUrl": "/uploads/announcements/1/thumbnail.webp",
+        "bannerUrl": "/uploads/announcements/1/banner.webp",
+        "photoUrl": null,
+        "publishedAt": "2026-03-15T09:00:00.000Z",
+        "createdAt": "2026-03-10T08:00:00.000Z",
+        "updatedAt": "2026-03-15T09:00:00.000Z"
+      },
+      {
+        "id": 2,
+        "title": "New Partnership Announcement",
+        "content": "ASEM is proud to partner with...",
+        "authorId": 3,
+        "researchNetworkId": null,
+        "status": "published",
+        "isPinned": false,
+        "thumbnailUrl": "/uploads/announcements/2/thumbnail.webp",
+        "bannerUrl": null,
+        "photoUrl": "/uploads/announcements/2/photo.webp",
+        "publishedAt": "2026-03-20T10:00:00.000Z",
+        "createdAt": "2026-03-18T14:00:00.000Z",
+        "updatedAt": "2026-03-20T10:00:00.000Z"
+      }
+    ],
     "pagination": {
       "page": 1,
-      "limit": 20,
-      "total": 150,
-      "pages": 8,
+      "limit": 5,
+      "total": 12,
+      "pages": 3,
       "hasNext": true,
       "hasPrev": false
     }
@@ -1952,316 +1725,549 @@ GET /api/v1/users?page=1&limit=20
 }
 ```
 
-**Required:** Email verified + Admin or Moderator role
-
 ---
 
-### 2. Get User by ID
-**GET** `/users/:id` 🔒
+#### `GET /announcements/:id`
 
-Get specific user details.
+Get a single announcement by ID. **Public.**
 
-**Headers:**
+**Auth**: None
+
+**Path Parameters**:
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | integer | Announcement ID |
+
+**Example Request**:
 ```
-Authorization: Bearer <access_token>
+GET /announcements/1
 ```
 
-**Path Parameters:**
-- `id` - User ID
-
-**Example:**
-```
-GET /api/v1/users/5
-```
-
-**Response:** `200 OK`
+**Response** `200 OK`:
 ```json
 {
   "success": true,
-  "message": "User retrieved successfully",
+  "message": "Announcement retrieved successfully",
   "data": {
-    "user": {
-      "id": 5,
-      "email": "user@example.com",
-      "username": "johndoe",
-      "firstName": "John",
-      "lastName": "Doe",
-      ...
+    "announcement": {
+      "id": 1,
+      "title": "ASEM Annual Conference 2026",
+      "content": "We are pleased to announce the upcoming ASEM Annual Conference...",
+      "authorId": 1,
+      "researchNetworkId": 1,
+      "status": "published",
+      "isPinned": true,
+      "thumbnailUrl": "/uploads/announcements/1/thumbnail.webp",
+      "bannerUrl": "/uploads/announcements/1/banner.webp",
+      "photoUrl": null,
+      "publishedAt": "2026-03-15T09:00:00.000Z",
+      "deletedAt": null,
+      "createdAt": "2026-03-10T08:00:00.000Z",
+      "updatedAt": "2026-03-15T09:00:00.000Z"
     }
   }
 }
 ```
 
-**Permissions:** Admin, Moderator, or the user themselves
+**Error Responses**:
+
+| Status | Code | Description |
+|--------|------|-------------|
+| `404` | `NOT_FOUND` | Announcement not found |
 
 ---
 
-### 3. Create User
-**POST** `/users` 🔒 👑 Admin Only
+#### `POST /announcements`
 
-Manually create a new user account.
+Create a new announcement. **Admin or Moderator only.**
 
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
+**Auth**: 🔒 Bearer Token (admin, moderator)  
+**Content-Type**: `multipart/form-data` (when uploading images) or `application/json`
 
-**Request Body:**
+**Form Fields / Body**:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `title` | string | ✅ | Announcement title, 1–255 chars |
+| `content` | string | ✅ | Announcement content (rich text / HTML) |
+| `status` | string | ❌ | `"draft"` (default), `"published"`, or `"archived"` |
+| `researchNetworkId` | integer | ❌ | Associated research network ID |
+| `isPinned` | boolean | ❌ | Pin to top (default: `false`) |
+
+**Image Fields** (optional, `multipart/form-data`):
+
+| Field | Max Size | Accepted Formats | Output Size |
+|-------|----------|------------------|-------------|
+| `thumbnail` | 5 MB | JPEG, PNG, WebP | 300×200 WebP |
+| `banner` | 5 MB | JPEG, PNG, WebP | 1200×400 WebP |
+| `photo` | 5 MB | JPEG, PNG, WebP | 1200×800 WebP |
+
+> Images are automatically resized and converted to WebP format.
+
+**Example Request** (JSON, no images):
 ```json
 {
-  "email": "newuser@example.com",
-  "username": "newuser",
-  "password": "Password123!",
-  "firstName": "New",
-  "lastName": "User",
-  "role": "moderator",
-  ... (same fields as registration)
+  "title": "Call for Papers — ASEM 2026",
+  "content": "We invite researchers to submit papers for the ASEM 2026 conference...",
+  "status": "published",
+  "researchNetworkId": 1,
+  "isPinned": false
 }
 ```
 
-**Optional:** `role` field (admin, moderator, user)
-
-**Response:** `201 Created`
-
-**Required:** Email verified + Admin role
-
----
-
-### 4. Update User
-**PUT** `/users/:id` 🔒
-
-Update user information.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
+**Example Request** (cURL with images):
+```bash
+curl -X POST https://engagement.chula.ac.th/asem-api/api/v1/announcements \
+  -H "Authorization: Bearer eyJhbGci..." \
+  -F "title=Call for Papers — ASEM 2026" \
+  -F "content=We invite researchers to submit papers..." \
+  -F "status=draft" \
+  -F "thumbnail=@./image-thumb.jpg" \
+  -F "banner=@./image-banner.png"
 ```
 
-**Path Parameters:**
-- `id` - User ID
-
-**Request Body:** (all fields optional)
-```json
-{
-  "email": "newemail@example.com",
-  "username": "newusername",
-  "firstName": "Updated",
-  "lastName": "Name",
-  "institution": "New University",
-  "department": "New Department",
-  "areasOfExpertise": "Updated expertise",
-  "country": "Canada",
-  "researchNetwork": "New network",
-  "role": "moderator",
-  "isActive": true
-}
-```
-
-**Response:** `200 OK`
+**Response** `201 Created`:
 ```json
 {
   "success": true,
-  "message": "User updated successfully",
+  "message": "Announcement created successfully",
   "data": {
-    "user": { ... }
+    "announcement": {
+      "id": 5,
+      "title": "Call for Papers — ASEM 2026",
+      "content": "We invite researchers to submit papers for the ASEM 2026 conference...",
+      "authorId": 1,
+      "researchNetworkId": 1,
+      "status": "published",
+      "isPinned": false,
+      "thumbnailUrl": "/uploads/announcements/5/thumbnail.webp",
+      "bannerUrl": "/uploads/announcements/5/banner.webp",
+      "photoUrl": null,
+      "publishedAt": "2026-04-04T12:00:00.000Z",
+      "createdAt": "2026-04-04T12:00:00.000Z",
+      "updatedAt": "2026-04-04T12:00:00.000Z"
+    }
   }
 }
 ```
 
-**Permissions:** Admin, Moderator, or the user themselves
-
 ---
 
-### 5. Delete User
-**DELETE** `/users/:id` 🔒 👑 Admin Only
+#### `PUT /announcements/:id`
 
-Delete user (soft or hard delete).
+Update an announcement. **Admin or Moderator only.**
 
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
+**Auth**: 🔒 Bearer Token (admin, moderator)  
+**Content-Type**: `multipart/form-data` or `application/json`
 
-**Path Parameters:**
-- `id` - User ID
+**Path Parameters**:
 
-**Query Parameters:**
-- `hard` (optional) - Set to "true" for permanent deletion (default: false)
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | integer | Announcement ID |
 
-**Examples:**
-```
-DELETE /api/v1/users/5              (soft delete)
-DELETE /api/v1/users/5?hard=true    (permanent delete)
-```
+**Form Fields / Body** — at least one field required:
 
-**Response:** `200 OK`
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `title` | string | ❌ | Updated title, 1–255 chars |
+| `content` | string | ❌ | Updated content |
+| `status` | string | ❌ | `"draft"`, `"published"`, or `"archived"` |
+| `researchNetworkId` | integer | ❌ | Updated research network ID |
+| `isPinned` | boolean | ❌ | Pin/unpin |
+
+Image fields (`thumbnail`, `banner`, `photo`) are the same as CREATE — uploading a new image replaces the existing one.
+
+**Example Request**:
 ```json
 {
-  "success": true,
-  "message": "User deleted successfully"
+  "title": "Updated: Call for Papers — ASEM 2026",
+  "status": "published"
 }
 ```
 
-**Warning:** Hard delete is permanent and cannot be undone!
-
-**Required:** Email verified + Admin role
-
----
-
-### 6. Restore User
-**POST** `/users/:id/restore` 🔒 👑 Admin Only
-
-Restore a soft-deleted user.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Path Parameters:**
-- `id` - User ID
-
-**Response:** `200 OK`
+**Response** `200 OK`:
 ```json
 {
   "success": true,
-  "message": "User restored successfully",
+  "message": "Announcement updated successfully",
   "data": {
-    "user": { ... }
+    "announcement": {
+      "id": 5,
+      "title": "Updated: Call for Papers — ASEM 2026",
+      "content": "We invite researchers to submit papers for the ASEM 2026 conference...",
+      "authorId": 1,
+      "researchNetworkId": 1,
+      "status": "published",
+      "isPinned": false,
+      "thumbnailUrl": "/uploads/announcements/5/thumbnail.webp",
+      "bannerUrl": "/uploads/announcements/5/banner.webp",
+      "photoUrl": null,
+      "publishedAt": "2026-03-15T09:00:00.000Z",
+      "createdAt": "2026-04-04T12:00:00.000Z",
+      "updatedAt": "2026-04-04T13:00:00.000Z"
+    }
   }
 }
 ```
 
-**Required:** Email verified + Admin role
-
 ---
 
-## 🏥 Health Check
+#### `DELETE /announcements/:id`
 
-### Server Health
-**GET** `/health`
+Soft-delete an announcement. **Admin or Moderator only.**
 
-Check if server is running.
+**Auth**: 🔒 Bearer Token (admin, moderator)
 
-**Response:** `200 OK`
+**Path Parameters**:
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | integer | Announcement ID |
+
+**Example Request**:
+```
+DELETE /announcements/5
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Response** `200 OK`:
 ```json
 {
   "success": true,
-  "message": "Server is healthy",
+  "message": "Announcement deleted successfully",
+  "data": null
+}
+```
+
+---
+
+### Discussions
+
+Discussions are nested under announcements: `/announcements/:announcementId/discussions`
+
+Discussions support **threaded replies** via the optional `parentId` field.
+
+#### `GET /announcements/:announcementId/discussions`
+
+List discussions for an announcement with pagination. **Public.**
+
+**Auth**: None
+
+**Path Parameters**:
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `announcementId` | integer | Parent announcement ID |
+
+**Query Parameters**:
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `page` | integer | `1` | Page number (≥ 1) |
+| `limit` | integer | `20` | Items per page (1–100) |
+
+**Example Request**:
+```
+GET /announcements/1/discussions?page=1&limit=10
+```
+
+**Response** `200 OK`:
+```json
+{
+  "success": true,
+  "message": "Discussions retrieved successfully",
   "data": {
-    "uptime": 12345,
-    "timestamp": "2026-02-14T10:30:00.000Z"
+    "items": [
+      {
+        "id": 1,
+        "announcementId": 1,
+        "parentId": null,
+        "authorId": 10,
+        "content": "Great announcement! Looking forward to participating.",
+        "deletedAt": null,
+        "createdAt": "2026-04-01T10:00:00.000Z",
+        "updatedAt": "2026-04-01T10:00:00.000Z"
+      },
+      {
+        "id": 2,
+        "announcementId": 1,
+        "parentId": 1,
+        "authorId": 5,
+        "content": "Me too! Are there any specific topics of interest this year?",
+        "deletedAt": null,
+        "createdAt": "2026-04-01T11:30:00.000Z",
+        "updatedAt": "2026-04-01T11:30:00.000Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "total": 8,
+      "pages": 1,
+      "hasNext": false,
+      "hasPrev": false
+    }
   }
 }
 ```
 
-### API Health
-**GET** `/api/v1/health`
-
-Check if API is running.
-
 ---
 
-## Error Codes
+#### `GET /announcements/:announcementId/discussions/:id`
 
-| Code | Description |
-|------|-------------|
-| `VALIDATION_ERROR` | Input validation failed |
-| `UNAUTHORIZED` | Authentication required or failed |
-| `TOKEN_REQUIRED` | No access token provided |
-| `TOKEN_EXPIRED` | Access token has expired |
-| `INVALID_TOKEN` | Token is invalid |
-| `EMAIL_NOT_VERIFIED` | Email verification required |
-| `FORBIDDEN` | Insufficient permissions |
-| `NOT_FOUND` | Resource not found |
-| `DUPLICATE_ENTRY` | Email or username already exists |
-| `RATE_LIMIT_EXCEEDED` | Too many requests |
-| `INTERNAL_ERROR` | Server error |
+Get a single discussion by ID. **Public.**
 
----
+**Auth**: None
 
-## Rate Limits
+**Path Parameters**:
 
-| Endpoint | Limit |
-|----------|-------|
-| General API | 100 requests / 15 min |
-| Login/Register | 10 requests / 15 min |
-| Password Reset | 3 requests / 1 hour |
-| Email Verification | 5 requests / 1 hour |
+| Param | Type | Description |
+|-------|------|-------------|
+| `announcementId` | integer | Parent announcement ID |
+| `id` | integer | Discussion ID |
 
----
-
-## User Roles & Permissions
-
-| Role | Permissions |
-|------|-------------|
-| **user** | Access own profile, update own info |
-| **moderator** | All user permissions + view all users |
-| **admin** | All permissions including user management |
-
----
-
-## Password Requirements
-
-- Minimum 8 characters
-- At least one uppercase letter
-- At least one lowercase letter
-- At least one number
-- At least one special character (@$!%*?&)
-
----
-
-## Token Lifetimes
-
-- **Access Token:** 15 minutes
-- **Refresh Token:** 7 days
-- **Email Verification Token:** 24 hours
-- **Password Reset Token:** 1 hour
-
----
-
-## Testing with cURL
-
-### Complete Registration Flow
-
-1. **Register:**
-```bash
-curl -X POST http://localhost:5000/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "username": "testuser",
-    "password": "Test123!@#",
-    "firstName": "Test",
-    "lastName": "User"
-  }'
+**Example Request**:
+```
+GET /announcements/1/discussions/1
 ```
 
-2. **Verify Email:**
-```bash
-curl "http://localhost:5000/api/v1/auth/verify-email?token=YOUR_TOKEN"
-```
-
-3. **Login:**
-```bash
-curl -X POST http://localhost:5000/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "password": "Test123!@#"
-  }'
-```
-
-4. **Access Protected Route:**
-```bash
-curl http://localhost:5000/api/v1/auth/me \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+**Response** `200 OK`:
+```json
+{
+  "success": true,
+  "message": "Discussion retrieved successfully",
+  "data": {
+    "discussion": {
+      "id": 1,
+      "announcementId": 1,
+      "parentId": null,
+      "authorId": 10,
+      "content": "Great announcement! Looking forward to participating.",
+      "deletedAt": null,
+      "createdAt": "2026-04-01T10:00:00.000Z",
+      "updatedAt": "2026-04-01T10:00:00.000Z"
+    }
+  }
+}
 ```
 
 ---
 
-## Legend
+#### `POST /announcements/:announcementId/discussions`
 
-- 🔒 = Requires authentication
-- 👑 = Requires admin/moderator role
-- ✉️ = Verified email required
+Create a new discussion (comment or reply) on an announcement. **Authenticated users.**
+
+**Auth**: 🔒 Bearer Token (any authenticated user)
+
+**Path Parameters**:
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `announcementId` | integer | Parent announcement ID |
+
+**Request Body** (`application/json`):
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `content` | string | ✅ | Discussion content, 1–5000 chars |
+| `parentId` | integer | ❌ | ID of parent discussion for threaded replies |
+
+**Example Request** (top-level comment):
+```json
+{
+  "content": "This is a great initiative! How can we contribute?"
+}
+```
+
+**Example Request** (reply to discussion #1):
+```json
+{
+  "content": "You can contribute by submitting a paper before the deadline.",
+  "parentId": 1
+}
+```
+
+**Response** `201 Created`:
+```json
+{
+  "success": true,
+  "message": "Discussion created successfully",
+  "data": {
+    "discussion": {
+      "id": 3,
+      "announcementId": 1,
+      "parentId": 1,
+      "authorId": 10,
+      "content": "You can contribute by submitting a paper before the deadline.",
+      "deletedAt": null,
+      "createdAt": "2026-04-04T14:00:00.000Z",
+      "updatedAt": "2026-04-04T14:00:00.000Z"
+    }
+  }
+}
+```
+
+---
+
+#### `PUT /announcements/:announcementId/discussions/:id`
+
+Update a discussion. **Authenticated** — ownership checked in service (author, admin, or moderator can edit).
+
+**Auth**: 🔒 Bearer Token
+
+**Path Parameters**:
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `announcementId` | integer | Parent announcement ID |
+| `id` | integer | Discussion ID |
+
+**Request Body** (`application/json`):
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `content` | string | ✅ | Updated content, 1–5000 chars |
+
+**Example Request**:
+```json
+{
+  "content": "Updated: You can contribute by submitting a paper before May 15, 2026."
+}
+```
+
+**Response** `200 OK`:
+```json
+{
+  "success": true,
+  "message": "Discussion updated successfully",
+  "data": {
+    "discussion": {
+      "id": 3,
+      "announcementId": 1,
+      "parentId": 1,
+      "authorId": 10,
+      "content": "Updated: You can contribute by submitting a paper before May 15, 2026.",
+      "deletedAt": null,
+      "createdAt": "2026-04-04T14:00:00.000Z",
+      "updatedAt": "2026-04-04T14:30:00.000Z"
+    }
+  }
+}
+```
+
+**Error Responses**:
+
+| Status | Code | Description |
+|--------|------|-------------|
+| `403` | `FORBIDDEN` | Not the author and not admin/moderator |
+| `404` | `NOT_FOUND` | Discussion not found |
+
+---
+
+#### `DELETE /announcements/:announcementId/discussions/:id`
+
+Soft-delete a discussion. **Authenticated** — ownership checked in service (author, admin, or moderator can delete).
+
+**Auth**: 🔒 Bearer Token
+
+**Path Parameters**:
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `announcementId` | integer | Parent announcement ID |
+| `id` | integer | Discussion ID |
+
+**Example Request**:
+```
+DELETE /announcements/1/discussions/3
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Response** `200 OK`:
+```json
+{
+  "success": true,
+  "message": "Discussion deleted successfully",
+  "data": null
+}
+```
+
+**Error Responses**:
+
+| Status | Code | Description |
+|--------|------|-------------|
+| `403` | `FORBIDDEN` | Not the author and not admin/moderator |
+| `404` | `NOT_FOUND` | Discussion not found |
+
+---
+
+## Static Files
+
+Uploaded announcement images are served as static files:
+
+| Environment | URL Pattern |
+|-------------|-------------|
+| **Production** | `https://engagement.chula.ac.th/asem-api/uploads/announcements/{id}/{type}.webp` |
+| **Development** | `http://localhost:5001/uploads/announcements/{id}/{type}.webp` |
+
+Where `{type}` is `thumbnail`, `banner`, or `photo`.
+
+---
+
+## Quick Reference — All Endpoints
+
+| Method | Endpoint | Auth | Role | Description |
+|--------|----------|------|------|-------------|
+| `GET` | `/health` | — | — | Server health check |
+| `GET` | `/api/v1/health` | — | — | API health check |
+| **Auth** | | | | |
+| `POST` | `/auth/register` | — | — | Register new user |
+| `POST` | `/auth/login` | — | — | Login |
+| `POST` | `/auth/refresh-token` | — | — | Refresh access token |
+| `POST` | `/auth/logout` | 🔒 | any | Logout (revoke refresh token) |
+| `GET` | `/auth/verify-email` | — | — | Verify email (query: `token`) |
+| `POST` | `/auth/resend-verification` | — | — | Resend verification email |
+| `POST` | `/auth/forgot-password` | — | — | Request password reset |
+| `GET` | `/auth/verify-reset-token` | — | — | Check reset token validity |
+| `POST` | `/auth/reset-password` | — | — | Reset password with token |
+| `POST` | `/auth/change-password` | 🔒 | any | Change own password |
+| `GET` | `/auth/me` | 🔒 | any | Get current user profile |
+| **Users** | | | | |
+| `GET` | `/users` | 🔒 | admin, moderator | List users (paginated) |
+| `POST` | `/users` | 🔒 | admin | Create user |
+| `GET` | `/users/:id` | 🔒 | owner, admin, mod | Get user by ID |
+| `PUT` | `/users/:id` | 🔒 | owner, admin, mod | Update user |
+| `DELETE` | `/users/:id` | 🔒 | admin | Delete user (soft/hard) |
+| `POST` | `/users/:id/restore` | 🔒 | admin | Restore soft-deleted user |
+| **Countries** | | | | |
+| `GET` | `/countries` | — | — | List all countries |
+| `GET` | `/countries/:id` | 🔒 | any | Get country by ID |
+| `POST` | `/countries` | 🔒 | admin | Create country |
+| `PUT` | `/countries/:id` | 🔒 | admin | Update country |
+| `DELETE` | `/countries/:id` | 🔒 | admin | Delete country |
+| **Institutions** | | | | |
+| `GET` | `/institutions` | — | — | List institutions (paginated) |
+| `GET` | `/institutions/:id` | 🔒 | any | Get institution by ID |
+| `POST` | `/institutions` | 🔒 | admin | Create institution |
+| `PUT` | `/institutions/:id` | 🔒 | admin | Update institution |
+| `DELETE` | `/institutions/:id` | 🔒 | admin | Delete institution |
+| **Research Networks** | | | | |
+| `GET` | `/research-networks` | — | — | List all research networks |
+| `GET` | `/research-networks/:id` | 🔒 | any | Get research network by ID |
+| `POST` | `/research-networks` | 🔒 | admin | Create research network |
+| `PUT` | `/research-networks/:id` | 🔒 | admin | Update research network |
+| `DELETE` | `/research-networks/:id` | 🔒 | admin | Delete research network |
+| **Announcements** | | | | |
+| `GET` | `/announcements` | — | — | List announcements (paginated, filterable) |
+| `GET` | `/announcements/:id` | — | — | Get announcement by ID |
+| `POST` | `/announcements` | 🔒 | admin, moderator | Create announcement (multipart) |
+| `PUT` | `/announcements/:id` | 🔒 | admin, moderator | Update announcement (multipart) |
+| `DELETE` | `/announcements/:id` | 🔒 | admin, moderator | Soft-delete announcement |
+| **Discussions** | | | | |
+| `GET` | `/announcements/:aId/discussions` | — | — | List discussions (paginated) |
+| `GET` | `/announcements/:aId/discussions/:id` | — | — | Get discussion by ID |
+| `POST` | `/announcements/:aId/discussions` | 🔒 | any | Create discussion |
+| `PUT` | `/announcements/:aId/discussions/:id` | 🔒 | author, admin, mod | Update discussion |
+| `DELETE` | `/announcements/:aId/discussions/:id` | 🔒 | author, admin, mod | Soft-delete discussion |
