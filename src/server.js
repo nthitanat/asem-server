@@ -1,6 +1,7 @@
 // Load environment configuration first
 require('./config/env.config');
 const express = require('express');
+const path = require('path');
 const helmet = require('helmet');
 const cors = require('cors');
 const morgan = require('morgan');
@@ -45,6 +46,9 @@ if (process.env.NODE_ENV === 'development') {
 
 // Rate limiting
 app.use('/api', apiLimiter);
+
+// Serve uploaded images (announcement thumbnails, banners, photos)
+app.use('/uploads', express.static(path.join(__dirname, '../uploads'), { dotfiles: 'deny' }));
 
 // Mount routes
 app.use('/', routes);

@@ -5,6 +5,8 @@ const userRoutes = require('./user.routes');
 const countryRoutes = require('./country.routes');
 const institutionRoutes = require('./institution.routes');
 const researchNetworkRoutes = require('./researchNetwork.routes');
+const announcementRoutes = require('./announcement.routes');
+const discussionRoutes = require('./discussion.routes');
 
 // API version prefix
 const API_VERSION = process.env.API_VERSION || 'v1';
@@ -15,6 +17,8 @@ router.use(`/api/${API_VERSION}/users`, userRoutes);
 router.use(`/api/${API_VERSION}/countries`, countryRoutes);
 router.use(`/api/${API_VERSION}/institutions`, institutionRoutes);
 router.use(`/api/${API_VERSION}/research-networks`, researchNetworkRoutes);
+router.use(`/api/${API_VERSION}/announcements`, announcementRoutes);
+router.use(`/api/${API_VERSION}/announcements/:announcementId/discussions`, discussionRoutes);
 
 // Health check endpoint
 router.get('/health', (req, res) => {

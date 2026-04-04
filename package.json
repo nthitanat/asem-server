@@ -8,10 +8,10 @@
     "start:dev": "NODE_ENV=development node src/server.js",
     "dev": "NODE_ENV=development nodemon src/server.js",
     "start:prod": "NODE_ENV=production node src/server.js",
-    "docker:dev": "docker-compose -f docker-compose.yml -f docker-compose.dev.yml up",
+    "docker:dev": "docker-compose -f docker-compose.yml -f docker-compose.dev.yml down && docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build",
     "docker:dev:build": "docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build",
     "docker:dev:down": "docker-compose -f docker-compose.yml -f docker-compose.dev.yml down",
-    "docker:prod": "docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d",
+    "docker:prod": "docker-compose -f docker-compose.yml -f docker-compose.prod.yml down && docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build",
     "docker:prod:build": "docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build",
     "docker:prod:down": "docker-compose -f docker-compose.yml -f docker-compose.prod.yml down",
     "docker:logs": "docker-compose logs -f app",
@@ -26,22 +26,30 @@
     "deploy:init:no-vpn": "./deploy/deploy.sh --skip-vpn init",
     "deploy:update:no-vpn": "./deploy/deploy.sh --skip-vpn update"
   },
-  "keywords": ["asem", "api", "rest", "mysql", "jwt"],
+  "keywords": [
+    "asem",
+    "api",
+    "rest",
+    "mysql",
+    "jwt"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.18.2",
-    "mysql2": "^3.6.0",
     "bcrypt": "^5.1.1",
-    "jsonwebtoken": "^9.0.2",
-    "dotenv": "^16.3.1",
-    "helmet": "^7.1.0",
     "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
     "express-rate-limit": "^7.1.0",
+    "helmet": "^7.1.0",
     "joi": "^17.11.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "multer": "^2.1.1",
+    "mysql2": "^3.6.0",
     "nodemailer": "^6.9.7",
-    "winston": "^3.11.0",
-    "morgan": "^1.10.0"
+    "sharp": "^0.34.5",
+    "winston": "^3.11.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

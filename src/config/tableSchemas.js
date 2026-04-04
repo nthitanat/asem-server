@@ -357,6 +357,161 @@ const tableSchemas = {
     indexes: [
       { name: 'idx_research_network_name', columns: ['name'] }
     ]
+  },
+
+  announcements: {
+    tableName: 'announcements',
+    columns: {
+      id: {
+        type: 'INT',
+        primaryKey: true,
+        autoIncrement: true,
+        nullable: false
+      },
+      title: {
+        type: 'VARCHAR(255)',
+        nullable: false
+      },
+      content: {
+        type: 'TEXT',
+        nullable: false
+      },
+      author_id: {
+        type: 'INT',
+        nullable: true,
+        foreignKey: {
+          table: 'users',
+          column: 'id',
+          onDelete: 'SET NULL'
+        }
+      },
+      research_network_id: {
+        type: 'INT',
+        nullable: true,
+        foreignKey: {
+          table: 'research_networks',
+          column: 'id',
+          onDelete: 'SET NULL'
+        }
+      },
+      status: {
+        type: "ENUM('draft','published','archived')",
+        default: "'draft'",
+        nullable: false
+      },
+      is_pinned: {
+        type: 'BOOLEAN',
+        default: 'false',
+        nullable: false
+      },
+      thumbnail_url: {
+        type: 'VARCHAR(500)',
+        nullable: true,
+        default: 'NULL'
+      },
+      banner_url: {
+        type: 'VARCHAR(500)',
+        nullable: true,
+        default: 'NULL'
+      },
+      photo_url: {
+        type: 'VARCHAR(500)',
+        nullable: true,
+        default: 'NULL'
+      },
+      published_at: {
+        type: 'TIMESTAMP',
+        nullable: true,
+        default: 'NULL'
+      },
+      deleted_at: {
+        type: 'TIMESTAMP',
+        nullable: true,
+        default: 'NULL'
+      },
+      created_at: {
+        type: 'TIMESTAMP',
+        default: 'CURRENT_TIMESTAMP',
+        nullable: false
+      },
+      updated_at: {
+        type: 'TIMESTAMP',
+        default: 'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+        nullable: false
+      }
+    },
+    indexes: [
+      { name: 'idx_announcement_author', columns: ['author_id'] },
+      { name: 'idx_announcement_network', columns: ['research_network_id'] },
+      { name: 'idx_announcement_status', columns: ['status'] },
+      { name: 'idx_announcement_deleted', columns: ['deleted_at'] },
+      { name: 'idx_announcement_published', columns: ['published_at'] }
+    ]
+  },
+
+  discussions: {
+    tableName: 'discussions',
+    columns: {
+      id: {
+        type: 'INT',
+        primaryKey: true,
+        autoIncrement: true,
+        nullable: false
+      },
+      announcement_id: {
+        type: 'INT',
+        nullable: false,
+        foreignKey: {
+          table: 'announcements',
+          column: 'id',
+          onDelete: 'CASCADE'
+        }
+      },
+      parent_id: {
+        type: 'INT',
+        nullable: true,
+        default: 'NULL',
+        foreignKey: {
+          table: 'discussions',
+          column: 'id',
+          onDelete: 'SET NULL'
+        }
+      },
+      author_id: {
+        type: 'INT',
+        nullable: true,
+        foreignKey: {
+          table: 'users',
+          column: 'id',
+          onDelete: 'SET NULL'
+        }
+      },
+      content: {
+        type: 'TEXT',
+        nullable: false
+      },
+      deleted_at: {
+        type: 'TIMESTAMP',
+        nullable: true,
+        default: 'NULL'
+      },
+      created_at: {
+        type: 'TIMESTAMP',
+        default: 'CURRENT_TIMESTAMP',
+        nullable: false
+      },
+      updated_at: {
+        type: 'TIMESTAMP',
+        default: 'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+        nullable: false
+      }
+    },
+    indexes: [
+      { name: 'idx_discussion_announcement', columns: ['announcement_id'] },
+      { name: 'idx_discussion_parent', columns: ['parent_id'] },
+      { name: 'idx_discussion_author', columns: ['author_id'] },
+      { name: 'idx_discussion_deleted', columns: ['deleted_at'] }
+    ]
   }
 };
 

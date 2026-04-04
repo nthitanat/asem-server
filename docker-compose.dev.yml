@@ -23,6 +23,8 @@ services:
       - ./.env.development:/app/.env.development
       # Prevent node_modules from being overwritten
       - /app/node_modules
+      # Persist uploaded images across container restarts
+      - ./uploads:/app/uploads
     command: npm run dev
 
   # MailDev - Email testing tool (development only)

@@ -17,6 +17,9 @@ services:
       - DB_HOST=172.21.0.1
       # Add production-specific overrides here if needed
     # No source code volumes in production - code is baked into image
+    volumes:
+      # Persist uploaded images across container restarts and deployments
+      - ./uploads:/app/uploads
     logging:
       driver: "json-file"
       options:

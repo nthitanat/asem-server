@@ -1,6 +1,6 @@
 # General Architecture Documentation
 
-**Last Updated**: April 4, 2026  
+**Last Updated**: April 4, 2026 (added Image Upload Workflow section)  
 **Purpose**: Comprehensive guide to the Node.js/Express API architecture  
 **Audience**: Future developers and AI assistants working with this codebase
 
@@ -16,7 +16,8 @@
 6. [Naming Conventions](#naming-conventions)
 7. [Error Handling](#error-handling)
 8. [Adding New Resources](#adding-new-resources)
-9. [Common Pitfalls](#common-pitfalls)
+9. [Image Upload Workflow](#image-upload-workflow)
+10. [Common Pitfalls](#common-pitfalls)
 
 ---
 
@@ -1471,6 +1472,269 @@ router.post(
 - [ ] Database has snake_case columns
 - [ ] Validation errors return correct format
 - [ ] Auth/authorization middleware works
+
+---
+
+## Image Upload Workflow
+
+This section describes the general pattern for adding file upload capability to any resource. It uses **multer** (multipart parsing) + **sharp** (resize/compress) + **Express static** (serving). Images are stored on the server disk (on-premise), not in external object storage.
+
+### Packages
+
+| Package | Role |
+|---|---|
+| `multer` | Parses `multipart/form-data` requests; holds file buffers in memory |
+| `sharp` | Resizes and converts buffers to WebP before writing to disk |
+| `express.static` | Serves the saved files as public HTTP URLs (built into Express) |
+
+### Storage Layout
+
+All uploads live under `uploads/` in the project root, which is bind-mounted to the container via `docker-compose` volumes:
+
+```
+uploads/
+  tmp/
+    {timestamp}-{random}/     ← written by processImages middleware; auto-cleaned
+      {fieldName}.webp
+      {fieldName}.webp
+  {resource}/
+    {resource_id}/             ← final permanent location
+      {fieldName}.webp
+      {fieldName}.webp
+```
+
+The database stores only the **relative URL path** (e.g. `/uploads/products/42/cover.webp`), not binary data.
+
+> **Field names are defined per resource.** A resource decides which image fields it needs (e.g. `cover`, `avatar`, `logo`) and declares them when configuring `uploadFields`. There is no globally mandated set of image field names.
+
+### Upload Middleware (`src/middleware/upload.middleware.js`)
+
+Two exports that slot into any route chain:
+
+```javascript
+const { uploadFields, processImages } = require('../middleware/upload.middleware');
+```
+
+**`uploadFields`** — multer instance with:
+- `storage: memoryStorage()` — files held in buffer, not written to disk yet
+- `limits: { fileSize: 5MB }` — hard cap per file
+- `fileFilter: imageOnly` — whitelist `image/jpeg`, `image/png`, `image/webp`; rejects others with 400
+- `.fields([...])` — declares which field names to accept; **all fields are optional**
+
+**`processImages`** — wrapped with `asyncHandler`; for each buffer in `req.files`:
+1. Looks up the resize spec for the field name
+2. Runs `sharp` to resize to defined dimensions and convert to WebP
+3. Writes output to `/uploads/tmp/{timestamp}-{random}/`
+4. Attaches `req.tempImagePaths = { {fieldName}Path?, ... }` for the service to consume
+5. Skips silently if no files were uploaded
+
+**Registering image fields for a resource:**
+
+Edit `upload.middleware.js` to add the resource's field names and desired dimensions:
+
+```javascript
+// Example: declare which fields this middleware accepts and their resize specs
+const IMAGE_SPECS = {
+  // Define field name → { width, height } per your resource's needs
+  cover:   { width: 800,  height: 600  },
+  avatar:  { width: 200,  height: 200  },
+  logo:    { width: 400,  height: 200  },
+  // ... add more as needed
+};
+
+const uploadFields = multer({ ... }).fields(
+  Object.keys(IMAGE_SPECS).map(name => ({ name, maxCount: 1 }))
+);
+```
+
+> Use `fit: 'cover'` for crops to exact dimensions, or `fit: 'inside'` to preserve aspect ratio. Format is always WebP at quality 85.
+
+### Route Chain Order
+
+Upload middleware slots **after** role authorization and **before** body validation:
+
+```javascript
+// POST — create with optional images
+router.post(
+  '/',
+  authenticateToken,              // 1. Authenticate
+  requireRole([...]),             // 2. Authorize
+  uploadFields,                   // 3. Parse multipart, hold buffers in memory
+  processImages,                  // 4. Resize + write to /uploads/tmp/
+  validate(createSchema, 'body'), // 5. Validate text fields only
+  resourceController.create       // 6. Handle request
+);
+
+// PUT — update with optional new images
+// Params validated BEFORE uploadFields so req.params.id is available
+router.put(
+  '/:id',
+  authenticateToken,
+  requireRole([...]),
+  validate(idParamSchema, 'params'),  // validate params first
+  uploadFields,
+  processImages,
+  validate(updateSchema, 'body'),
+  resourceController.update
+);
+```
+
+> **Note**: Image fields are **not** declared in Joi schemas. They arrive via `req.files` (parsed by multer) and `req.tempImagePaths` (set by `processImages`), not `req.body`. The Joi schema only validates text fields.
+
+### Controller Pattern
+
+Pass `req.tempImagePaths` alongside `req.body` as a single object — no special handling needed per field:
+
+```javascript
+const createResource = asyncHandler(async (req, res) => {
+  const resource = await resourceService.createResource({
+    ...req.body,
+    authorId: req.user.id,
+    tempImagePaths: req.tempImagePaths || {}  // {} if no images uploaded
+  });
+  return successResponse(res, { resource }, 'Resource created successfully', 201);
+});
+
+const updateResource = asyncHandler(async (req, res) => {
+  const resource = await resourceService.updateResource(
+    parseInt(req.params.id, 10),
+    {
+      ...req.body,
+      tempImagePaths: req.tempImagePaths || {}
+    }
+  );
+  return successResponse(res, { resource }, 'Resource updated successfully');
+});
+```
+
+### Service Pattern
+
+The service moves files from `tmp/` to the final directory and keeps the DB in sync. Use a transaction for multi-step create operations:
+
+```javascript
+const createResource = async (data) => {
+  const { tempImagePaths = {}, ...resourceData } = data;
+
+  const connection = await beginTransaction();
+  try {
+    // 1. INSERT row (image URL columns = NULL initially)
+    const insertId = await resourceModel.createResource(resourceData);
+
+    // 2. Move temp files → /uploads/{resource}/{id}/ and get URL map
+    const imageUrls = Object.keys(tempImagePaths).length > 0
+      ? moveImages(insertId, tempImagePaths)  // returns { {fieldName}Url: '/uploads/...' }
+      : {};
+
+    // 3. UPDATE row with final URL paths (only if images were uploaded)
+    if (Object.keys(imageUrls).length > 0) {
+      await resourceModel.updateResource(insertId, imageUrls);
+    }
+
+    await commit(connection);
+    return resourceModel.findResourceById(insertId);
+  } catch (err) {
+    await rollback(connection);
+    fs.rm(tempDir, { recursive: true, force: true }, () => {});
+    throw err;
+  }
+};
+
+const updateResource = async (id, data) => {
+  const { tempImagePaths = {}, ...updates } = data;
+
+  // New upload overwrites the file at the same path — URL in DB stays unchanged
+  const imageUrls = Object.keys(tempImagePaths).length > 0
+    ? moveImages(id, tempImagePaths)
+    : {};
+
+  return resourceModel.updateResource(id, { ...updates, ...imageUrls });
+};
+
+const deleteResource = async (id) => {
+  await resourceModel.softDeleteResource(id);
+  // Remove all images for this resource from disk
+  fs.rm(path.join(UPLOADS_DIR, String(id)), { recursive: true, force: true }, () => {});
+};
+```
+
+**`moveImages` helper** (defined in the service file):
+- Creates `/uploads/{resource}/{id}/` directory
+- `fs.renameSync` each temp file to `{fieldName}.webp` in the final directory
+- Returns `{ {fieldName}Url: '/uploads/{resource}/{id}/{fieldName}.webp', ... }`
+
+### Model Pattern
+
+Each image field is a plain `VARCHAR(500) NULL` column. Name the column after the image's purpose (`{fieldName}_url`). Include all image URL columns in the `allowedFields` whitelist:
+
+```javascript
+// In tableSchemas.js — name columns after your resource's image fields
+cover_url:  { type: 'VARCHAR(500)', nullable: true, default: 'NULL' },
+avatar_url: { type: 'VARCHAR(500)', nullable: true, default: 'NULL' },
+
+// In model updateResource — add image URL columns to the allowed whitelist
+const allowedFields = [
+  'name', /* ... other text fields ... */,
+  'cover_url', 'avatar_url'  // add your resource's image URL columns here
+];
+```
+
+### Serving Images
+
+In `server.js`, registered once before route mounting (already in place):
+
+```javascript
+app.use('/uploads', express.static(path.join(__dirname, '../uploads'), { dotfiles: 'deny' }));
+```
+
+Clients access images directly via the URL stored in the DB field:
+```
+GET /uploads/{resource}/{id}/{fieldName}.webp
+```
+
+### Docker Volume (required)
+
+Already added to both `docker-compose.dev.yml` and `docker-compose.prod.yml`:
+
+```yaml
+volumes:
+  - ./uploads:/app/uploads
+```
+
+This ensures images persist across container restarts and rebuilds.
+
+### Image Resize Configuration
+
+Define dimensions in `upload.middleware.js` under `IMAGE_SPECS`. Choose values appropriate for the field's purpose in your UI:
+
+```javascript
+const IMAGE_SPECS = {
+  fieldName: { width: W, height: H }
+  // width/height in pixels; uses fit: 'cover' by default
+};
+```
+
+All images are saved as **WebP at quality 85** regardless of the original format. Adjust quality in `upload.middleware.js` if needed.
+
+### Security Checklist
+
+- ✅ MIME type whitelist in multer `fileFilter` (JPEG, PNG, WebP only)
+- ✅ File size limit enforced by multer (`5MB` per file)
+- ✅ User-supplied filenames are never used — filenames derived from field name only
+- ✅ `express.static` served with `dotfiles: 'deny'`
+- ✅ Upload directory is outside the `src/` code tree
+- ✅ Image URLs stored as relative paths — no external redirects
+
+### Adding Image Upload to a New Resource (Checklist)
+
+- [ ] Decide which image fields the resource needs and their purpose (e.g. `cover`, `logo`)
+- [ ] Add `{fieldName}_url VARCHAR(500) NULL` columns to the `tableSchemas.js` entry
+- [ ] Add `{fieldName}_url` columns to model `allowedFields` in `updateResource`
+- [ ] Register field names and dimensions in `IMAGE_SPECS` in `upload.middleware.js`
+- [ ] Add `uploadFields`, `processImages` to the route chain (after role, before validate)
+- [ ] Pass `tempImagePaths: req.tempImagePaths || {}` in controller create/update
+- [ ] Add `moveImages` + transaction logic in service create; overwrite logic in service update
+- [ ] Add `fs.rm(imageDir, ...)` in service delete
+- [ ] Create `uploads/{resource}/` directory with a `.gitkeep` file
 
 ---
 
