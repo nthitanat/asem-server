@@ -1,32 +1,71 @@
 const nodemailer = require('nodemailer');
+const { google } = require('googleapis');
 const emailConfig = require('../config/email.config');
 const logger = require('../utils/logger.util');
 
 /**
- * Create email transporter.
- * Uses Gmail OAuth2 (HTTPS, port 443) when GMAIL_REFRESH_TOKEN is set — bypasses SMTP firewall.
- * Falls back to SMTP transport for local dev (MailDev).
+ * Create SMTP transporter (used in dev with MailDev).
  */
 const createTransporter = () => {
-  if (emailConfig.gmail.refreshToken) {
-    return nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        type: 'OAuth2',
-        user: emailConfig.gmail.user,
-        clientId: emailConfig.gmail.clientId,
-        clientSecret: emailConfig.gmail.clientSecret,
-        refreshToken: emailConfig.gmail.refreshToken
-      }
-    });
-  }
-
   return nodemailer.createTransport({
     host: emailConfig.host,
     port: emailConfig.port,
     secure: emailConfig.secure,
     auth: emailConfig.auth
   });
+};
+
+/**
+ * Send email via Gmail REST API over HTTPS (port 443).
+ * This bypasses SMTP firewall entirely — outbound TCP is never used.
+ */
+const sendViaGmailAPI = async (mailOptions) => {
+  const oauth2Client = new google.auth.OAuth2(
+    emailConfig.gmail.clientId,
+    emailConfig.gmail.clientSecret
+  );
+  oauth2Client.setCredentials({ refresh_token: emailConfig.gmail.refreshToken });
+
+  const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+
+  // Encode subject safely for non-ASCII characters
+  const encodedSubject = `=?UTF-8?B?${Buffer.from(mailOptions.subject).toString('base64')}?=`;
+
+  // Build RFC 2822 MIME message (multipart/alternative for HTML + plain text)
+  const boundary = `boundary_${Date.now()}`;
+  const rawLines = [
+    `From: ${mailOptions.from}`,
+    `To: ${mailOptions.to}`,
+    `Subject: ${encodedSubject}`,
+    'MIME-Version: 1.0',
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    '',
+    `--${boundary}`,
+    'Content-Type: text/plain; charset=UTF-8',
+    '',
+    mailOptions.text || '',
+    '',
+    `--${boundary}`,
+    'Content-Type: text/html; charset=UTF-8',
+    'Content-Transfer-Encoding: base64',
+    '',
+    Buffer.from(mailOptions.html).toString('base64').replace(/(.{76})/g, '$1\r\n'),
+    '',
+    `--${boundary}--`
+  ];
+
+  const raw = Buffer.from(rawLines.join('\r\n')).toString('base64url');
+  await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
+};
+
+/**
+ * Unified send function — routes to Gmail API (prod) or SMTP (dev).
+ */
+const sendEmail = async (mailOptions) => {
+  if (emailConfig.gmail.refreshToken) {
+    return sendViaGmailAPI(mailOptions);
+  }
+  return createTransporter().sendMail(mailOptions);
 };
 
 /**
@@ -155,8 +194,7 @@ const sendVerificationEmail = async (user, token) => {
   };
 
   try {
-    const transporter = createTransporter();
-    await transporter.sendMail(mailOptions);
+    await sendEmail(mailOptions);
     logger.info(`Verification email sent to ${user.email}`);
     return true;
   } catch (error) {
@@ -237,8 +275,7 @@ const sendPasswordResetEmail = async (user, token) => {
   };
 
   try {
-    const transporter = createTransporter();
-    await transporter.sendMail(mailOptions);
+    await sendEmail(mailOptions);
     logger.info(`Password reset email sent to ${user.email}`);
     return true;
   } catch (error) {
@@ -296,8 +333,7 @@ const sendPasswordChangedEmail = async (user) => {
   };
 
   try {
-    const transporter = createTransporter();
-    await transporter.sendMail(mailOptions);
+    await sendEmail(mailOptions);
     logger.info(`Password changed confirmation sent to ${user.email}`);
     return true;
   } catch (error) {
@@ -381,8 +417,7 @@ const sendWelcomeEmail = async (user) => {
   };
 
   try {
-    const transporter = createTransporter();
-    await transporter.sendMail(mailOptions);
+    await sendEmail(mailOptions);
     logger.info(`Welcome email sent to ${user.email}`);
     return true;
   } catch (error) {
