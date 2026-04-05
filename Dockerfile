@@ -5,8 +5,8 @@
 FROM node:18-alpine AS base
 WORKDIR /app
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# Install dumb-init for proper signal handling and su-exec for privilege dropping
+RUN apk add --no-cache dumb-init su-exec
 
 # Copy package files
 COPY package*.json ./
@@ -46,14 +46,18 @@ RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001 && \
     chown -R nodejs:nodejs /app
 
-# Switch to non-root user
-USER nodejs
+# Copy entrypoint script — runs as root to fix bind-mount volume ownership
+# then drops to nodejs user via su-exec before starting the app
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Note: no USER directive — entrypoint.sh handles privilege drop at runtime
 
 # Expose application port
 EXPOSE 5001
 
-# Use dumb-init to handle signals properly
-ENTRYPOINT ["dumb-init", "--"]
+# Use dumb-init for signal handling, then run entrypoint which drops to nodejs
+ENTRYPOINT ["dumb-init", "--", "/usr/local/bin/entrypoint.sh"]
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
