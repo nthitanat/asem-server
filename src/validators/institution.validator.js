@@ -39,9 +39,18 @@ const paginationQuerySchema = Joi.object({
   limit: Joi.number().integer().min(1).max(100).default(20)
 });
 
+const countryIdParamSchema = Joi.object({
+  countryId: Joi.number().integer().positive().required().messages({
+    'number.base': 'Country ID must be a number',
+    'number.positive': 'Country ID must be a positive number',
+    'any.required': 'Country ID is required'
+  })
+});
+
 module.exports = {
   idParamSchema,
   createInstitutionSchema,
   updateInstitutionSchema,
-  paginationQuerySchema
+  paginationQuerySchema,
+  countryIdParamSchema
 };

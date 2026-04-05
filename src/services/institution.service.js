@@ -120,10 +120,37 @@ const deleteInstitution = async (id) => {
   logger.info(`Institution deleted: ${institution.name}`);
 };
 
+/**
+ * Get paginated institutions filtered by country ID
+ * @param {number} countryId
+ * @param {number} page
+ * @param {number} limit
+ * @returns {Promise<Object>} { institutions, total, page, limit }
+ */
+const getInstitutionsByCountry = async (countryId, page = 1, limit = 20) => {
+  const country = await countryModel.findCountryById(countryId);
+  if (!country) {
+    const error = new Error('Country not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const institutions = await institutionModel.getInstitutionsByCountryId(countryId, page, limit);
+  const total = await institutionModel.countInstitutionsByCountryId(countryId);
+
+  return {
+    institutions,
+    total,
+    page: parseInt(page, 10),
+    limit: parseInt(limit, 10)
+  };
+};
+
 module.exports = {
   getAllInstitutions,
   getInstitutionById,
   createInstitution,
   updateInstitution,
-  deleteInstitution
+  deleteInstitution,
+  getInstitutionsByCountry
 };

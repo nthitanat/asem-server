@@ -1315,6 +1315,66 @@ GET /institutions?page=1&limit=10
 
 ---
 
+#### `GET /institutions/country/:countryId`
+
+List institutions belonging to a specific country with pagination. **Public** — no authentication required.
+
+**Auth**: None
+
+**Path Parameters**:
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `countryId` | integer | Country ID (positive integer) |
+
+**Query Parameters**:
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `page` | integer | `1` | Page number (≥ 1) |
+| `limit` | integer | `20` | Items per page (1–100) |
+
+**Example Request**:
+```
+GET /institutions/country/1?page=1&limit=10
+```
+
+**Response** `200 OK`:
+```json
+{
+  "success": true,
+  "message": "Institutions retrieved successfully",
+  "data": {
+    "items": [
+      {
+        "id": 1,
+        "name": "Chulalongkorn University",
+        "countryId": 1,
+        "countryName": "Thailand",
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "updatedAt": "2026-01-01T00:00:00.000Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "total": 1,
+      "pages": 1,
+      "hasNext": false,
+      "hasPrev": false
+    }
+  }
+}
+```
+
+**Error Responses**:
+
+| Status | Code | Description |
+|--------|------|-------------|
+| `404` | `NOT_FOUND` | Country not found |
+
+---
+
 #### `GET /institutions/:id`
 
 Get a single institution by ID.
@@ -2249,6 +2309,7 @@ Where `{type}` is `thumbnail`, `banner`, or `photo`.
 | `DELETE` | `/countries/:id` | 🔒 | admin | Delete country |
 | **Institutions** | | | | |
 | `GET` | `/institutions` | — | — | List institutions (paginated) |
+| `GET` | `/institutions/country/:countryId` | — | — | List institutions by country (paginated) |
 | `GET` | `/institutions/:id` | 🔒 | any | Get institution by ID |
 | `POST` | `/institutions` | 🔒 | admin | Create institution |
 | `PUT` | `/institutions/:id` | 🔒 | admin | Update institution |

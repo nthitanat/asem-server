@@ -114,6 +114,40 @@ const deleteInstitution = async (id) => {
   return await query('DELETE FROM institutions WHERE id = ?', [id]);
 };
 
+/**
+ * Get paginated institutions filtered by country ID
+ * @param {number} countryId
+ * @param {number} page
+ * @param {number} limit
+ * @returns {Promise<Array>} Array of institutions (camelCase)
+ */
+const getInstitutionsByCountryId = async (countryId, page = 1, limit = 20) => {
+  const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+  const results = await query(
+    `SELECT i.*, c.name AS country_name
+     FROM institutions i
+     LEFT JOIN countries c ON i.country_id = c.id
+     WHERE i.country_id = ?
+     ORDER BY i.name ASC
+     LIMIT ? OFFSET ?`,
+    [countryId, parseInt(limit, 10), offset]
+  );
+  return toCamelCaseArray(results);
+};
+
+/**
+ * Count institutions by country ID
+ * @param {number} countryId
+ * @returns {Promise<number>}
+ */
+const countInstitutionsByCountryId = async (countryId) => {
+  const result = await queryOne(
+    'SELECT COUNT(*) AS total FROM institutions WHERE country_id = ?',
+    [countryId]
+  );
+  return result.total;
+};
+
 module.exports = {
   getAllInstitutions,
   countInstitutions,
@@ -121,5 +155,7 @@ module.exports = {
   findInstitutionByNameAndCountry,
   createInstitution,
   updateInstitution,
-  deleteInstitution
+  deleteInstitution,
+  getInstitutionsByCountryId,
+  countInstitutionsByCountryId
 };

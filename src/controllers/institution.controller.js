@@ -60,10 +60,33 @@ const deleteInstitution = asyncHandler(async (req, res) => {
   return successResponse(res, null, 'Institution deleted successfully');
 });
 
+/**
+ * Get institutions by country ID with pagination
+ * GET /api/v1/institutions/country/:countryId
+ */
+const getInstitutionsByCountry = asyncHandler(async (req, res) => {
+  const { countryId } = req.params;
+  const { page, limit } = req.query;
+  const result = await institutionService.getInstitutionsByCountry(
+    parseInt(countryId, 10),
+    page,
+    limit
+  );
+  return paginatedResponse(
+    res,
+    result.institutions,
+    result.page,
+    result.limit,
+    result.total,
+    'Institutions retrieved successfully'
+  );
+});
+
 module.exports = {
   getAllInstitutions,
   getInstitutionById,
   createInstitution,
   updateInstitution,
-  deleteInstitution
+  deleteInstitution,
+  getInstitutionsByCountry
 };

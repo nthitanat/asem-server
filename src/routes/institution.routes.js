@@ -8,7 +8,8 @@ const {
   idParamSchema,
   createInstitutionSchema,
   updateInstitutionSchema,
-  paginationQuerySchema
+  paginationQuerySchema,
+  countryIdParamSchema
 } = require('../validators/institution.validator');
 
 // Get all institutions with pagination (public)
@@ -16,6 +17,14 @@ router.get(
   '/',
   validate(paginationQuerySchema, 'query'),
   institutionController.getAllInstitutions
+);
+
+// Get institutions by country ID with pagination (public)
+router.get(
+  '/country/:countryId',
+  validate(countryIdParamSchema, 'params'),
+  validate(paginationQuerySchema, 'query'),
+  institutionController.getInstitutionsByCountry
 );
 
 // Get institution by ID (any authenticated user)
