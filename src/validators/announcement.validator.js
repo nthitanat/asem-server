@@ -54,8 +54,6 @@ const updateAnnouncementSchema = Joi.object({
     'string.uri': 'Iframe URL must be a valid URI',
     'string.max': 'Iframe URL must not exceed 2048 characters'
   })
-}).min(1).messages({
-  'object.min': 'At least one field must be provided'
 });
 
 const announcementQuerySchema = Joi.object({
