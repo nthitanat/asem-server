@@ -5,8 +5,9 @@ const fs = require('fs');
 const { asyncHandler } = require('./errorHandler.middleware');
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_PDF_SIZE = 10 * 1024 * 1024; // 10 MB
 
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const IMAGE_SPECS = {
   thumbnail: { width: 300, height: 200 },
@@ -15,35 +16,47 @@ const IMAGE_SPECS = {
 };
 
 /**
- * Multer file filter — whitelist image MIME types only
+ * Multer file filter — field-aware: allows images for image fields, PDF for pdfFile field
  */
-const imageOnly = (req, file, cb) => {
-  if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-    cb(null, true);
+const fileFilter = (req, file, cb) => {
+  if (file.fieldname === 'pdfFile') {
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      const error = new Error(`Invalid file type: ${file.mimetype}. Only PDF files are allowed for the pdfFile field.`);
+      error.statusCode = 400;
+      cb(error, false);
+    }
   } else {
-    const error = new Error(`Invalid file type: ${file.mimetype}. Only JPEG, PNG, and WebP images are allowed.`);
-    error.statusCode = 400;
-    cb(error, false);
+    if (ALLOWED_IMAGE_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      const error = new Error(`Invalid file type: ${file.mimetype}. Only JPEG, PNG, and WebP images are allowed.`);
+      error.statusCode = 400;
+      cb(error, false);
+    }
   }
 };
 
 /**
  * Multer instance with memory storage
- * All three image fields are optional
+ * Image fields and pdfFile field are all optional
  */
 const uploadFields = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_FILE_SIZE },
-  fileFilter: imageOnly
+  limits: { fileSize: MAX_PDF_SIZE },
+  fileFilter
 }).fields([
   { name: 'thumbnail', maxCount: 1 },
   { name: 'banner', maxCount: 1 },
-  { name: 'photo', maxCount: 1 }
+  { name: 'photo', maxCount: 1 },
+  { name: 'pdfFile', maxCount: 1 }
 ]);
 
 /**
  * Process uploaded image buffers with sharp and write to temp directory.
- * Attaches req.tempImagePaths = { thumbnailPath?, bannerPath?, photoPath? }
+ * Also handles PDF files (written directly without processing).
+ * Attaches req.tempImagePaths = { thumbnailPath?, bannerPath?, photoPath?, pdfPath? }
  */
 const processImages = asyncHandler(async (req, res, next) => {
   req.tempImagePaths = {};
@@ -70,6 +83,14 @@ const processImages = asyncHandler(async (req, res, next) => {
 
       req.tempImagePaths[`${field}Path`] = outputPath;
     }
+  }
+
+  // Handle PDF file (write buffer directly, no processing)
+  if (req.files.pdfFile && req.files.pdfFile[0]) {
+    const pdfFile = req.files.pdfFile[0];
+    const outputPath = path.join(tmpDir, 'document.pdf');
+    fs.writeFileSync(outputPath, pdfFile.buffer);
+    req.tempImagePaths.pdfPath = outputPath;
   }
 
   next();

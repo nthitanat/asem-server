@@ -16,11 +16,18 @@ const UPLOADS_DIR = path.join(__dirname, '../../uploads/announcements');
 const buildImageUrl = (id, field) => `/uploads/announcements/${id}/${field}.webp`;
 
 /**
- * Move image files from temp directory to final announcement directory.
+ * Build final PDF URL from announcement ID
+ * @param {number} id
+ * @returns {string}
+ */
+const buildPdfUrl = (id) => `/uploads/announcements/${id}/document.pdf`;
+
+/**
+ * Move image/PDF files from temp directory to final announcement directory.
  * Returns an object with URL keys to merge into announcement data.
  * @param {number} announcementId
- * @param {Object} tempImagePaths - { thumbnailPath?, bannerPath?, photoPath? }
- * @returns {Object} { thumbnailUrl?, bannerUrl?, photoUrl? }
+ * @param {Object} tempImagePaths - { thumbnailPath?, bannerPath?, photoPath?, pdfPath? }
+ * @returns {Object} { thumbnailUrl?, bannerUrl?, photoUrl?, pdfUrl? }
  */
 const moveImages = (announcementId, tempImagePaths) => {
   const destDir = path.join(UPLOADS_DIR, String(announcementId));
@@ -29,16 +36,21 @@ const moveImages = (announcementId, tempImagePaths) => {
   const imageUrls = {};
 
   const fieldMap = [
-    { pathKey: 'thumbnailPath', urlKey: 'thumbnailUrl', filename: 'thumbnail' },
-    { pathKey: 'bannerPath', urlKey: 'bannerUrl', filename: 'banner' },
-    { pathKey: 'photoPath', urlKey: 'photoUrl', filename: 'photo' }
+    { pathKey: 'thumbnailPath', urlKey: 'thumbnailUrl', filename: 'thumbnail', ext: '.webp' },
+    { pathKey: 'bannerPath', urlKey: 'bannerUrl', filename: 'banner', ext: '.webp' },
+    { pathKey: 'photoPath', urlKey: 'photoUrl', filename: 'photo', ext: '.webp' },
+    { pathKey: 'pdfPath', urlKey: 'pdfUrl', filename: 'document', ext: '.pdf' }
   ];
 
-  for (const { pathKey, urlKey, filename } of fieldMap) {
+  for (const { pathKey, urlKey, filename, ext } of fieldMap) {
     if (tempImagePaths[pathKey]) {
-      const destPath = path.join(destDir, `${filename}.webp`);
+      const destPath = path.join(destDir, `${filename}${ext}`);
       fs.renameSync(tempImagePaths[pathKey], destPath);
-      imageUrls[urlKey] = buildImageUrl(announcementId, filename);
+      if (ext === '.pdf') {
+        imageUrls[urlKey] = buildPdfUrl(announcementId);
+      } else {
+        imageUrls[urlKey] = buildImageUrl(announcementId, filename);
+      }
     }
   }
 

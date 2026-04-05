@@ -15,6 +15,12 @@ const createDiscussion = async (data) => {
     throw error;
   }
 
+  if (announcement.discussionEnabled === false) {
+    const error = new Error('Discussions are disabled for this announcement');
+    error.statusCode = 403;
+    throw error;
+  }
+
   if (data.parentId) {
     const parent = await discussionModel.findDiscussionById(data.parentId);
     if (!parent) {

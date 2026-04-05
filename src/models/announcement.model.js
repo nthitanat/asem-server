@@ -104,8 +104,8 @@ const createAnnouncement = async (data) => {
   const snakeData = toSnakeCase(data);
 
   const result = await query(
-    `INSERT INTO announcements (title, content, author_id, research_network_id, status, is_pinned, published_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO announcements (title, content, author_id, research_network_id, status, is_pinned, discussion_enabled, iframe_url, published_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       snakeData.title,
       snakeData.content,
@@ -113,6 +113,8 @@ const createAnnouncement = async (data) => {
       snakeData.research_network_id || null,
       snakeData.status || 'draft',
       snakeData.is_pinned ?? false,
+      snakeData.discussion_enabled ?? true,
+      snakeData.iframe_url || null,
       snakeData.status === 'published' ? new Date() : null
     ]
   );
@@ -131,7 +133,8 @@ const updateAnnouncement = async (id, updates) => {
 
   const allowedFields = [
     'title', 'content', 'status', 'is_pinned',
-    'research_network_id', 'thumbnail_url', 'banner_url', 'photo_url', 'published_at'
+    'research_network_id', 'thumbnail_url', 'banner_url', 'photo_url',
+    'discussion_enabled', 'iframe_url', 'pdf_url', 'published_at'
   ];
 
   const fields = [];

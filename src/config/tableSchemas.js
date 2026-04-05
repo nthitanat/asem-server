@@ -419,6 +419,21 @@ const tableSchemas = {
         nullable: true,
         default: 'NULL'
       },
+      discussion_enabled: {
+        type: 'BOOLEAN',
+        default: 'true',
+        nullable: false
+      },
+      iframe_url: {
+        type: 'VARCHAR(2048)',
+        nullable: true,
+        default: 'NULL'
+      },
+      pdf_url: {
+        type: 'VARCHAR(500)',
+        nullable: true,
+        default: 'NULL'
+      },
       published_at: {
         type: 'TIMESTAMP',
         nullable: true,

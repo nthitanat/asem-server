@@ -1750,9 +1750,12 @@ GET /announcements?page=1&limit=5&status=published
         "researchNetworkId": 1,
         "status": "published",
         "isPinned": true,
+        "discussionEnabled": true,
+        "iframeUrl": null,
         "thumbnailUrl": "/uploads/announcements/1/thumbnail.webp",
         "bannerUrl": "/uploads/announcements/1/banner.webp",
         "photoUrl": null,
+        "pdfUrl": null,
         "publishedAt": "2026-03-15T09:00:00.000Z",
         "createdAt": "2026-03-10T08:00:00.000Z",
         "updatedAt": "2026-03-15T09:00:00.000Z"
@@ -1765,9 +1768,12 @@ GET /announcements?page=1&limit=5&status=published
         "researchNetworkId": null,
         "status": "published",
         "isPinned": false,
+        "discussionEnabled": true,
+        "iframeUrl": "https://example.com/embed/partnership",
         "thumbnailUrl": "/uploads/announcements/2/thumbnail.webp",
         "bannerUrl": null,
         "photoUrl": "/uploads/announcements/2/photo.webp",
+        "pdfUrl": "/uploads/announcements/2/document.pdf",
         "publishedAt": "2026-03-20T10:00:00.000Z",
         "createdAt": "2026-03-18T14:00:00.000Z",
         "updatedAt": "2026-03-20T10:00:00.000Z"
@@ -1818,9 +1824,12 @@ GET /announcements/1
       "researchNetworkId": 1,
       "status": "published",
       "isPinned": true,
+      "discussionEnabled": true,
+      "iframeUrl": null,
       "thumbnailUrl": "/uploads/announcements/1/thumbnail.webp",
       "bannerUrl": "/uploads/announcements/1/banner.webp",
       "photoUrl": null,
+      "pdfUrl": null,
       "publishedAt": "2026-03-15T09:00:00.000Z",
       "deletedAt": null,
       "createdAt": "2026-03-10T08:00:00.000Z",
@@ -1854,6 +1863,8 @@ Create a new announcement. **Admin or Moderator only.**
 | `status` | string | ❌ | `"draft"` (default), `"published"`, or `"archived"` |
 | `researchNetworkId` | integer | ❌ | Associated research network ID |
 | `isPinned` | boolean | ❌ | Pin to top (default: `false`) |
+| `discussionEnabled` | boolean | ❌ | Allow discussions on this announcement (default: `true`) |
+| `iframeUrl` | string | ❌ | Embeddable iframe URL, max 2048 chars |
 
 **Image Fields** (optional, `multipart/form-data`):
 
@@ -1862,8 +1873,9 @@ Create a new announcement. **Admin or Moderator only.**
 | `thumbnail` | 5 MB | JPEG, PNG, WebP | 300×200 WebP |
 | `banner` | 5 MB | JPEG, PNG, WebP | 1200×400 WebP |
 | `photo` | 5 MB | JPEG, PNG, WebP | 1200×800 WebP |
+| `pdfFile` | 10 MB | PDF | Stored as-is |
 
-> Images are automatically resized and converted to WebP format.
+> Images are automatically resized and converted to WebP format. PDF files are stored without modification.
 
 **Example Request** (JSON, no images):
 ```json
@@ -1872,7 +1884,9 @@ Create a new announcement. **Admin or Moderator only.**
   "content": "We invite researchers to submit papers for the ASEM 2026 conference...",
   "status": "published",
   "researchNetworkId": 1,
-  "isPinned": false
+  "isPinned": false,
+  "discussionEnabled": true,
+  "iframeUrl": "https://example.com/embed/conference"
 }
 ```
 
@@ -1884,7 +1898,8 @@ curl -X POST https://engagement.chula.ac.th/asem-api/api/v1/announcements \
   -F "content=We invite researchers to submit papers..." \
   -F "status=draft" \
   -F "thumbnail=@./image-thumb.jpg" \
-  -F "banner=@./image-banner.png"
+  -F "banner=@./image-banner.png" \
+  -F "pdfFile=@./document.pdf"
 ```
 
 **Response** `201 Created`:
@@ -1901,9 +1916,12 @@ curl -X POST https://engagement.chula.ac.th/asem-api/api/v1/announcements \
       "researchNetworkId": 1,
       "status": "published",
       "isPinned": false,
+      "discussionEnabled": true,
+      "iframeUrl": "https://example.com/embed/conference",
       "thumbnailUrl": "/uploads/announcements/5/thumbnail.webp",
       "bannerUrl": "/uploads/announcements/5/banner.webp",
       "photoUrl": null,
+      "pdfUrl": "/uploads/announcements/5/document.pdf",
       "publishedAt": "2026-04-04T12:00:00.000Z",
       "createdAt": "2026-04-04T12:00:00.000Z",
       "updatedAt": "2026-04-04T12:00:00.000Z"
@@ -1936,8 +1954,10 @@ Update an announcement. **Admin or Moderator only.**
 | `status` | string | ❌ | `"draft"`, `"published"`, or `"archived"` |
 | `researchNetworkId` | integer | ❌ | Updated research network ID |
 | `isPinned` | boolean | ❌ | Pin/unpin |
+| `discussionEnabled` | boolean | ❌ | Enable/disable discussions |
+| `iframeUrl` | string | ❌ | Embeddable iframe URL, max 2048 chars (empty string to clear) |
 
-Image fields (`thumbnail`, `banner`, `photo`) are the same as CREATE — uploading a new image replaces the existing one.
+Image fields (`thumbnail`, `banner`, `photo`) and file field (`pdfFile`) are the same as CREATE — uploading a new file replaces the existing one.
 
 **Example Request**:
 ```json
@@ -1961,9 +1981,12 @@ Image fields (`thumbnail`, `banner`, `photo`) are the same as CREATE — uploadi
       "researchNetworkId": 1,
       "status": "published",
       "isPinned": false,
+      "discussionEnabled": true,
+      "iframeUrl": "https://example.com/embed/conference",
       "thumbnailUrl": "/uploads/announcements/5/thumbnail.webp",
       "bannerUrl": "/uploads/announcements/5/banner.webp",
       "photoUrl": null,
+      "pdfUrl": "/uploads/announcements/5/document.pdf",
       "publishedAt": "2026-03-15T09:00:00.000Z",
       "createdAt": "2026-04-04T12:00:00.000Z",
       "updatedAt": "2026-04-04T13:00:00.000Z"
@@ -2169,6 +2192,13 @@ Create a new discussion (comment or reply) on an announcement. **Authenticated u
 }
 ```
 
+**Error Responses**:
+
+| Status | Code | Description |
+|--------|------|-------------|
+| `403` | `FORBIDDEN` | Discussions are disabled for this announcement |
+| `404` | `NOT_FOUND` | Announcement or parent discussion not found |
+
 ---
 
 #### `PUT /announcements/:announcementId/discussions/:id`
@@ -2265,7 +2295,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ## Static Files
 
-Uploaded announcement images are served as static files:
+Uploaded announcement images and PDF files are served as static files:
 
 | Environment | URL Pattern |
 |-------------|-------------|
@@ -2273,6 +2303,13 @@ Uploaded announcement images are served as static files:
 | **Development** | `http://localhost:5001/uploads/announcements/{id}/{type}.webp` |
 
 Where `{type}` is `thumbnail`, `banner`, or `photo`.
+
+PDF files use the pattern:
+
+| Environment | URL Pattern |
+|-------------|-------------|
+| **Production** | `https://engagement.chula.ac.th/asem-api/uploads/announcements/{id}/document.pdf` |
+| **Development** | `http://localhost:5001/uploads/announcements/{id}/document.pdf` |
 
 ---
 
