@@ -25,8 +25,8 @@ const createAnnouncementSchema = Joi.object({
     'number.base': 'Research network ID must be a number',
     'number.positive': 'Research network ID must be a positive number'
   }),
-  isPinned: Joi.boolean().default(false),
-  discussionEnabled: Joi.boolean().default(true),
+  isPinned: Joi.boolean().truthy('true', '1').falsy('false', '0').default(false),
+  discussionEnabled: Joi.boolean().truthy('true', '1').falsy('false', '0').default(true),
   iframeUrl: Joi.string().uri().max(2048).allow('', null).optional().messages({
     'string.uri': 'Iframe URL must be a valid URI',
     'string.max': 'Iframe URL must not exceed 2048 characters'
@@ -48,8 +48,8 @@ const updateAnnouncementSchema = Joi.object({
     'number.base': 'Research network ID must be a number',
     'number.positive': 'Research network ID must be a positive number'
   }),
-  isPinned: Joi.boolean().optional(),
-  discussionEnabled: Joi.boolean().optional(),
+  isPinned: Joi.boolean().truthy('true', '1').falsy('false', '0').optional(),
+  discussionEnabled: Joi.boolean().truthy('true', '1').falsy('false', '0').optional(),
   iframeUrl: Joi.string().uri().max(2048).allow('', null).optional().messages({
     'string.uri': 'Iframe URL must be a valid URI',
     'string.max': 'Iframe URL must not exceed 2048 characters'
