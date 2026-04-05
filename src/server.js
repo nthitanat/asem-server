@@ -16,6 +16,10 @@ const { apiLimiter } = require('./middleware/rateLimiter.middleware');
 const app = express();
 const PORT = process.env.PORT || 5001;
 
+// Trust first proxy (nginx/reverse proxy) — required for rate limiter
+// to correctly identify clients via X-Forwarded-For
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet());
 
