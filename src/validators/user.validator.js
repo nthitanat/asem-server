@@ -179,7 +179,7 @@ const updateUserSchema = Joi.object({
       'any.only': 'Role must be one of: admin, moderator, user'
     }),
   
-  isActive: Joi.boolean()
+  isActive: Joi.boolean().truthy('true', '1').falsy('false', '0')
     .optional()
 }).min(1).messages({
   'object.min': 'At least one field must be provided for update'

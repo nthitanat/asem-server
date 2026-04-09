@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { beginTransaction, commit, rollback } = require('../utils/db.util');
+const { assertHasUpdates } = require('../utils/service.util');
 const announcementModel = require('../models/announcement.model');
 const researchNetworkModel = require('../models/researchNetwork.model');
 const logger = require('../utils/logger.util');
@@ -131,6 +132,8 @@ const getAnnouncementById = async (id) => {
  */
 const updateAnnouncement = async (id, data) => {
   const { tempImagePaths = {}, ...updates } = data;
+
+  assertHasUpdates(updates, tempImagePaths);
 
   const existing = await announcementModel.findAnnouncementById(id);
   if (!existing) {

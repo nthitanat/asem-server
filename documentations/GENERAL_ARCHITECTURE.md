@@ -227,14 +227,14 @@ const createResourceSchema = Joi.object({
     .positive()
     .optional(),
   
-  isActive: Joi.boolean()       // camelCase!
+  isActive: Joi.boolean().truthy('true', '1').falsy('false', '0')  // camelCase! accepts true/false/1/0/"true"/"false"/"1"/"0"
     .default(true)
 });
 
 const updateResourceSchema = Joi.object({
   name: Joi.string().max(255).optional(),
   categoryId: Joi.number().integer().positive().optional(),
-  isActive: Joi.boolean().optional()
+  isActive: Joi.boolean().truthy('true', '1').falsy('false', '0').optional()
 }).min(1); // At least one field required
 
 module.exports = {
@@ -257,8 +257,8 @@ parentId: Joi.number().integer().positive().optional()
 // Email
 email: Joi.string().email().required()
 
-// Boolean
-isActive: Joi.boolean().default(true)
+// Boolean — always include .truthy/.falsy to accept 1/0/"true"/"false" (e.g. form-data, query strings)
+isActive: Joi.boolean().truthy('true', '1').falsy('false', '0').default(true)
 
 // Enum
 role: Joi.string().valid('user', 'moderator', 'admin').default('user')
@@ -865,6 +865,22 @@ sanitizeInput(input)                // Trim + strip < > to prevent XSS
 formatJoiErrors(joiError)           // Normalize Joi error → [{ field, message }]
 ```
 
+#### `service.util.js`
+Business-layer guards used inside service functions.
+```javascript
+assertHasUpdates(textUpdates, filePaths)
+// Throws 400 if both objects are empty.
+// Use in every PUT service that accepts multipart/form-data.
+// Joi's .min(1) cannot see req.files, so it would incorrectly reject
+// image-only updates. This check covers both text and file updates.
+//
+// Example:
+//   const { tempImagePaths = {}, ...updates } = data;
+//   assertHasUpdates(updates, tempImagePaths);
+```
+
+> **Rule**: Every multipart PUT service **must** call `assertHasUpdates(updates, tempImagePaths)` immediately after destructuring `data`. Do **not** add `.min(1)` to the Joi update schema — it is blind to `req.files`.
+
 #### `tableSync.util.js`
 Reads `src/config/tableSchemas.js` and auto-creates/verifies tables at server startup. **Not called directly in application code** — only invoked in `server.js`.
 ```javascript
@@ -1364,13 +1380,13 @@ const Joi = require('joi');
 const createProductSchema = Joi.object({
   name: Joi.string().max(255).required(),
   categoryId: Joi.number().integer().positive().optional(),  // camelCase!
-  isActive: Joi.boolean().default(true)                      // camelCase!
+  isActive: Joi.boolean().truthy('true', '1').falsy('false', '0').default(true)  // camelCase!
 });
 
 const updateProductSchema = Joi.object({
   name: Joi.string().max(255).optional(),
   categoryId: Joi.number().integer().positive().optional(),
-  isActive: Joi.boolean().optional()
+  isActive: Joi.boolean().truthy('true', '1').falsy('false', '0').optional()
 }).min(1);
 
 const productIdParamSchema = Joi.object({
