@@ -1,6 +1,6 @@
 # General Architecture Documentation
 
-**Last Updated**: April 4, 2026 (added Image Upload Workflow section)  
+**Last Updated**: April 9, 2026 (added Foreign Key JOIN Rules section)  
 **Purpose**: Comprehensive guide to the Node.js/Express API architecture  
 **Audience**: Future developers and AI assistants working with this codebase
 
@@ -17,7 +17,8 @@
 7. [Error Handling](#error-handling)
 8. [Adding New Resources](#adding-new-resources)
 9. [Image Upload Workflow](#image-upload-workflow)
-10. [Common Pitfalls](#common-pitfalls)
+10. [Foreign Key JOIN Rules](#foreign-key-join-rules)
+11. [Common Pitfalls](#common-pitfalls)
 
 ---
 
@@ -785,7 +786,7 @@ module.exports = {
 - ✅ **DO**: Write SQL with snake_case column names
 - ✅ **DO**: Handle soft deletes with `deleted_at IS NULL`
 - ✅ **DO**: Use prepared statements (parameterized queries)
-- ✅ **DO**: Join related tables and alias names (e.g., `category_name`)
+- ✅ **DO**: Join related tables and alias names (e.g., `category_name`) — follow the [Foreign Key JOIN Rules](#foreign-key-join-rules)
 - ❌ **DON'T**: Return snake_case to services
 - ❌ **DON'T**: Put business logic in models
 - ❌ **DON'T**: Handle HTTP concerns
@@ -1751,6 +1752,48 @@ All images are saved as **WebP at quality 85** regardless of the original format
 - [ ] Add `moveImages` + transaction logic in service create; overwrite logic in service update
 - [ ] Add `fs.rm(imageDir, ...)` in service delete
 - [ ] Create `uploads/{resource}/` directory with a `.gitkeep` file
+
+---
+
+## Foreign Key JOIN Rules
+
+When writing a `SELECT` query in a model, use this decision table to determine whether to `LEFT JOIN` the referenced table and include its name column in the result.
+
+| Situation | JOIN needed? | Reason |
+|---|---|---|
+| FK references a **lookup / reference table** (e.g. countries, categories, statuses) | ✅ Yes | The client needs a display label alongside the ID without making a second request |
+| FK references **users as an author / owner** | ✅ Yes | The client needs a display name (username, first/last name) alongside the author ID |
+| FK is the **primary context** of the query — the client already has the parent resource | ❌ No | e.g. fetching discussions *by announcement ID*: the client already knows the announcement |
+| **Self-referencing FK** (parent–child on the same table) | ❌ No | Recursive joins are impractical; fetch the parent separately if needed |
+| The referenced table **has no human-readable name** or the FK is purely internal | ❌ No | Nothing useful to surface in the response |
+
+### Rule of thumb
+
+> If the client would need the referenced record's name to **render a UI label** without making another API call, JOIN it and include both the ID and the name in the response. If the client already has the context from the parent request, skip the JOIN.
+
+### Response convention
+
+When a JOIN is added, always return **both** the FK ID and the resolved name as sibling fields:
+
+```javascript
+// SQL (snake_case)
+SELECT r.*,
+       c.name AS country_name,
+       i.name AS institution_name
+FROM resources r
+LEFT JOIN countries c ON r.country_id = c.id
+LEFT JOIN institutions i ON r.institution_id = i.id
+
+// Resulting camelCase response (after toCamelCase)
+{
+  "countryId": 1,
+  "countryName": "Thailand",
+  "institutionId": 5,
+  "institutionName": "Chulalongkorn University"
+}
+```
+
+This means the consumer **never needs a separate lookup call** just to display a name.
 
 ---
 
