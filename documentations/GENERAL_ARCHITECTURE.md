@@ -1,6 +1,6 @@
 # General Architecture Documentation
 
-**Last Updated**: April 9, 2026 (added Foreign Key JOIN Rules section)  
+**Last Updated**: April 11, 2026 (added Internal Service-to-Service API section)  
 **Purpose**: Comprehensive guide to the Node.js/Express API architecture  
 **Audience**: Future developers and AI assistants working with this codebase
 
@@ -18,7 +18,8 @@
 8. [Adding New Resources](#adding-new-resources)
 9. [Image Upload Workflow](#image-upload-workflow)
 10. [Foreign Key JOIN Rules](#foreign-key-join-rules)
-11. [Common Pitfalls](#common-pitfalls)
+11. [Internal Service-to-Service API](#internal-service-to-service-api)
+12. [Common Pitfalls](#common-pitfalls)
 
 ---
 
@@ -932,6 +933,7 @@ All rate limit values are configured in `.env` files — the middleware reads th
 | `PASSWORD_RESET_RATE_LIMIT_MAX_REQUESTS` | Password reset limiter max requests | `3` |
 | `EMAIL_VERIFICATION_RATE_LIMIT_WINDOW_MS` | Email verification limiter window (ms) | `3600000` (1 hour) |
 | `EMAIL_VERIFICATION_RATE_LIMIT_MAX_REQUESTS` | Email verification limiter max requests | `5` |
+| `INTERNAL_API_KEY` | Secret key for internal service-to-service endpoints (`/internal/v1/*`) — never share with public clients | *(required)* |
 
 ---
 
@@ -1794,6 +1796,112 @@ LEFT JOIN institutions i ON r.institution_id = i.id
 ```
 
 This means the consumer **never needs a separate lookup call** just to display a name.
+
+---
+
+## Internal Service-to-Service API
+
+This section describes the pattern for internal HTTP endpoints that are consumed by other ASEM services (e.g., asem-mailer), not by end users.
+
+### Motivation
+
+asem-mailer needs to resolve a recipient list (email + name) from asem-server before sending a bulk campaign. Instead of duplicating the users table or sharing a database connection, asem-server exposes a dedicated internal endpoint protected by a **separate API key** — never the same key as the public API.
+
+### Route Prefix
+
+Internal routes are mounted at `/internal/v1/` — **completely separate** from `/api/v1/`. This makes it easy to block the prefix at a network/proxy layer if needed.
+
+```
+/api/v1/*        ← Public REST API — JWT authentication
+/internal/v1/*   ← Internal service-to-service — INTERNAL_API_KEY authentication
+```
+
+### Authentication: `authenticateInternalApiKey`
+
+Located in `src/middleware/auth.middleware.js`, exported alongside `authenticateToken` and `optionalAuth`.
+
+```javascript
+const authenticateInternalApiKey = (req, res, next) => {
+  const apiKey = req.headers['x-api-key'];
+  if (!apiKey || apiKey !== process.env.INTERNAL_API_KEY) {
+    return errorResponse(res, 'Invalid or missing internal API key', 401, 'UNAUTHORIZED');
+  }
+  next();
+};
+```
+
+**Rules**:
+- `INTERNAL_API_KEY` is a **separate** env var from any public API key
+- Internal routes apply `authenticateInternalApiKey` **only** — no JWT, no role check
+- Zero changes to `authenticateToken`, `optionalAuth`, or any existing `/api/v1` route
+
+### Existing Internal Endpoints
+
+| Method | Path | Middleware | Description |
+|--------|------|-----------|-------------|
+| `GET` | `/internal/v1/users/emails` | `authenticateInternalApiKey`, `validate(userEmailsQuerySchema, 'query')` | Return `[{ email, firstName, lastName }]` for active non-deleted users, with optional filters |
+
+**Query parameters** for `GET /internal/v1/users/emails`:
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `researchNetworkId` | number (optional) | Filter by research network |
+| `countryId` | number (optional) | Filter by country |
+| `institutionId` | number (optional) | Filter by institution |
+| `isActive` | boolean (default `true`) | Filter by active status |
+
+**Response shape**:
+```json
+{
+  "success": true,
+  "data": {
+    "entries": [
+      { "email": "user@example.com", "firstName": "Jane", "lastName": "Doe" }
+    ]
+  },
+  "message": "User emails retrieved successfully"
+}
+```
+
+**Response fields**: `email`, `firstName`, `lastName` **only** — passwords, tokens, and all other sensitive fields are never returned.
+
+### File Structure
+
+```
+src/
+  middleware/
+    auth.middleware.js          ← authenticateInternalApiKey added here
+  validators/
+    internalUser.validator.js   ← userEmailsQuerySchema
+  models/
+    user.model.js               ← findUserEmailsByFilter() added here
+  services/
+    internalUser.service.js     ← getUserEmails()
+  controllers/
+    internalUser.controller.js  ← getUserEmails handler
+  routes/
+    internal.routes.js          ← GET /users/emails
+    index.js                    ← router.use('/internal/v1', internalRoutes)
+```
+
+### Environment Variables
+
+| Service | Variable | Description |
+|---------|----------|-------------|
+| asem-server | `INTERNAL_API_KEY` | Secret key that internal clients must send in `X-API-Key` header |
+| asem-mailer | `ASEM_SERVER_INTERNAL_URL` | Base URL of asem-server (e.g. `http://asem-server:5001` in Docker) |
+| asem-mailer | `ASEM_SERVER_INTERNAL_KEY` | Must match asem-server's `INTERNAL_API_KEY` |
+
+### Adding New Internal Endpoints
+
+Follow this checklist:
+
+1. Add any new query/param validator to `src/validators/internalUser.validator.js` (or a new validator file for a different resource)
+2. Add a model function that returns **only the fields required** — never return passwords or tokens
+3. Add a service function with a descriptive log
+4. Add an `asyncHandler`-wrapped controller function
+5. Add the route to `src/routes/internal.routes.js` using `authenticateInternalApiKey` first
+6. No changes needed to `routes/index.js` — it already mounts `internalRoutes` at `/internal/v1`
 
 ---
 

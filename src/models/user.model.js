@@ -322,6 +322,52 @@ const restoreUser = async (id) => {
   return findUserById(id);
 };
 
+/**
+ * Get email, firstName, lastName for users matching optional filters.
+ * Used only by the internal /internal/v1/users/emails endpoint.
+ *
+ * @param {Object} filters - camelCase filter object
+ * @param {number} [filters.researchNetworkId]
+ * @param {number} [filters.countryId]
+ * @param {number} [filters.institutionId]
+ * @param {boolean} [filters.isActive=true]
+ * @returns {Promise<Array>} Array of { email, firstName, lastName } (camelCase)
+ */
+const findUserEmailsByFilter = async (filters = {}) => {
+  const snakeFilters = toSnakeCase(filters);
+
+  const conditions = ['u.deleted_at IS NULL'];
+  const params = [];
+
+  // isActive defaults to true — only return active users unless explicitly false
+  const isActive = snakeFilters.is_active !== undefined ? snakeFilters.is_active : true;
+  conditions.push('u.is_active = ?');
+  params.push(isActive ? 1 : 0);
+
+  if (snakeFilters.research_network_id) {
+    conditions.push('u.research_network_id = ?');
+    params.push(snakeFilters.research_network_id);
+  }
+  if (snakeFilters.country_id) {
+    conditions.push('u.country_id = ?');
+    params.push(snakeFilters.country_id);
+  }
+  if (snakeFilters.institution_id) {
+    conditions.push('u.institution_id = ?');
+    params.push(snakeFilters.institution_id);
+  }
+
+  const sql = `
+    SELECT u.email, u.first_name, u.last_name
+    FROM users u
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY u.first_name ASC, u.last_name ASC
+  `;
+
+  const results = await query(sql, params);
+  return toCamelCaseArray(results);
+};
+
 module.exports = {
   createUser,
   findUserById,
@@ -335,5 +381,6 @@ module.exports = {
   setEmailVerified,
   softDeleteUser,
   hardDeleteUser,
-  restoreUser
+  restoreUser,
+  findUserEmailsByFilter
 };

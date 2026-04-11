@@ -72,7 +72,21 @@ const optionalAuth = (req, res, next) => {
   }
 };
 
+/**
+ * Internal API key authentication middleware
+ * Checks X-API-Key header against INTERNAL_API_KEY env var.
+ * Used exclusively on /internal/v1 routes — never on public /api/v1 routes.
+ */
+const authenticateInternalApiKey = (req, res, next) => {
+  const apiKey = req.headers['x-api-key'];
+  if (!apiKey || apiKey !== process.env.INTERNAL_API_KEY) {
+    return errorResponse(res, 'Invalid or missing internal API key', 401, 'UNAUTHORIZED');
+  }
+  next();
+};
+
 module.exports = {
   authenticateToken,
-  optionalAuth
+  optionalAuth,
+  authenticateInternalApiKey
 };

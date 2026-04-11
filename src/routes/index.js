@@ -7,6 +7,7 @@ const institutionRoutes = require('./institution.routes');
 const researchNetworkRoutes = require('./researchNetwork.routes');
 const announcementRoutes = require('./announcement.routes');
 const discussionRoutes = require('./discussion.routes');
+const internalRoutes = require('./internal.routes');
 
 // API version prefix
 const API_VERSION = process.env.API_VERSION || 'v1';
@@ -19,6 +20,9 @@ router.use(`/api/${API_VERSION}/institutions`, institutionRoutes);
 router.use(`/api/${API_VERSION}/research-networks`, researchNetworkRoutes);
 router.use(`/api/${API_VERSION}/announcements`, announcementRoutes);
 router.use(`/api/${API_VERSION}/announcements/:announcementId/discussions`, discussionRoutes);
+
+// Internal service-to-service routes (protected by INTERNAL_API_KEY — no JWT)
+router.use(`/internal/${API_VERSION}`, internalRoutes);
 
 // Health check endpoint
 router.get('/health', (req, res) => {
